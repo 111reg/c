@@ -1,1571 +1,433 @@
-<!--
-Third-Party Libraries Used in This Project:
 
-1. CodeMirror 5
-   License: MIT License
-   Source: https://codemirror.net/
-
-2. Remix Icon
-   License: Apache License 2.0
-   Source: https://remixicon.com/
-
-3. CryptoJS
-   License: MIT License
-   Source: https://github.com/brix/crypto-js
-
-All third-party libraries are used in accordance with
-their respective licenses.
-
-The copyright notice "© 2025 洪子瀚. All rights reserved."
-applies ONLY to the original code written by the author.
--->
-<!--
-
-© 2025 洪子瀚
-
-All rights reserved.
-
-This copyright notice applies ONLY to the original code
-
-created by the author.
-
-This project includes third-party libraries.
-
-Such libraries are subject to their own licenses and
-
-are not covered by this copyright notice.
-
--->
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
-<meta charset="UTF-8">
-<title>Dev html++ (V21.5 In-Editor Window)</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.15/lib/codemirror.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.15/theme/dracula.min.css">
-<link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js"></script>
-
-<style>
-  /* --- 全局變數 & 新版 UI 配色 --- */
-  :root {
-    --base-font-size: 14px; 
-    --ui-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML 雲端執行器 PRO</title>
     
-    /* UI 尺寸 */
-    --ui-pad-y: clamp(4px, 0.8vh, 8px);
-    --ui-pad-x: clamp(8px, 1.5vw, 16px);
-    --ui-radius: 8px;
-    --btn-size: 36px;
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js" async defer></script>
 
-    /* 新版配色 */
-    --bg-app: #0f0f12;           
-    --bg-panel: #18181b;         
-    --border-color: #3f3f46;     
-    --text-main: #f8f8f2;        
-    --text-muted: #a1a1aa;  
-    --btn-bg: #232326;
-    --btn-hover: #333;
-    --accent-color: #6272a4;
-  }
+    <style>
+        :root {
+            --bg-color: #1e1e1e;
+            --sidebar-bg: #252526;
+            --tab-bg: #2d2d2d;
+            --tab-active: #1e1e1e;
+            --border-color: #333;
+            --text-color: #ccc;
+            --accent-color: #0e639c; /* VS Code Blue */
+            
+            /* 語法亮高 */
+            --hl-tag: #569cd6;
+            --hl-attr: #9cdcfe;
+            --hl-string: #ce9178;
+            --hl-comment: #6a9955;
+            --hl-keyword: #c586c0;
+            --hl-number: #b5cea8;
+        }
 
-  * { margin:0; padding:0; box-sizing:border-box; }
-  
-  body { 
-    font-family: var(--ui-font); 
-    background: var(--bg-app); 
-    color: var(--text-main); 
-    height: 100vh; 
-    height: 100dvh; 
-    overflow:hidden; 
-    touch-action: none; 
-  }
-    
-  .browser-container { 
-    margin: clamp(0px, 2vw, 20px); 
-    height: calc(100vh - clamp(0px, 4vw, 40px)); 
-    height: calc(100dvh - clamp(0px, 4vw, 40px)); 
-    background: var(--bg-panel); 
-    border-radius: var(--ui-radius); 
-    border: 1px solid var(--border-color);
-    overflow:hidden; 
-    box-shadow:0 20px 40px rgba(0,0,0,0.4); 
-    display:flex; 
-    flex-direction:column;
-    position: relative; 
-  }
-  
-  body.fullscreen-mode .browser-container {
-      margin: 0; border-radius: 0; border: none; height: 100vh; height: 100dvh;
-  }
-    
-  /* --- 分頁列 --- */
-  .tabs { 
-    display:flex; background: #1e1e1e; border-bottom:1px solid var(--border-color); 
-    padding: 6px 4px 0 4px; overflow-x:auto; scrollbar-width: none; position: relative; touch-action: pan-x;
-  }
-  .tabs::-webkit-scrollbar { display: none; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
 
-  .tab { 
-    display:flex; align-items:center; padding: 8px 12px; margin-right:2px; cursor:pointer; 
-    border-radius: var(--ui-radius) var(--ui-radius) 0 0; background: #2c2c2c; 
-    font-size: 13px; position:relative; color: var(--text-muted); flex-shrink:0; border: 1px solid transparent;
-    user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; 
-    transition: background 0.2s ease, transform 0.1s ease;
-  }
-  
-  .tab.active { 
-      background: var(--bg-panel); color: var(--text-main); font-weight: 500;
-      border-top: 2px solid var(--accent-color); z-index: 2; border-bottom: 1px solid var(--bg-panel); margin-bottom: -1px;
-  }
+        /* --- 頂部工具列 --- */
+        .toolbar {
+            background: var(--sidebar-bg);
+            padding: 8px 15px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
 
-  .tab .close-btn { margin-left:8px; font-size: 14px; opacity: 0.6; padding: 2px; border-radius: 50%; display: flex; align-items: center; justify-content: center; width: 18px; height: 18px;}
-  .tab .close-btn:hover { color:#ff5555; opacity: 1; background: rgba(255,255,255,0.1); }
-  .tab input { background: #000; border: 1px solid var(--accent-color); color: #fff; font-size: 13px; width: 100px; padding: 2px 4px; border-radius: 4px; }
-  .tab input:focus { outline:none; }
+        .btn {
+            background: #3c3c3c;
+            color: white;
+            border: 1px solid #444;
+            padding: 5px 12px;
+            font-size: 13px;
+            cursor: pointer;
+            border-radius: 3px;
+            transition: 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .btn:hover:not(:disabled) { background: #505050; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .btn-blue { background: var(--accent-color); border-color: var(--accent-color); }
+        .btn-blue:hover:not(:disabled) { background: #1177bb; }
+        .btn-green { background: #388a34; border-color: #388a34; }
+        
+        .divider { width: 1px; height: 20px; background: #444; margin: 0 5px; }
 
-  #newTabBtn { background: transparent; color: var(--text-muted); border: none; cursor: pointer; padding: 0 10px; font-size: 18px; display: flex; align-items: center; }
-  #newTabBtn:hover { color: #fff; }
+        /* --- 分頁列 --- */
+        .tabs-bar {
+            background: var(--sidebar-bg);
+            display: flex;
+            align-items: flex-end;
+            padding-left: 0;
+            gap: 1px;
+            height: 35px;
+            overflow-x: auto;
+        }
+        
+        .tab {
+            padding: 8px 20px;
+            background: var(--tab-bg);
+            color: #969696;
+            font-size: 13px;
+            cursor: pointer;
+            border-right: 1px solid var(--border-color);
+            min-width: 100px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            user-select: none;
+        }
+        
+        .tab:hover { background: #2a2d2e; }
+        
+        .tab.active {
+            background: var(--tab-active);
+            color: white;
+            border-top: 2px solid var(--accent-color);
+        }
 
-  /* --- 編輯器 --- */
-  .editor-container { position:relative; flex:1; overflow:hidden; padding-bottom:0; background: #282a36; }
-  .CodeMirror { 
-    position:absolute; top:0; bottom:0; left:0; right:0; height: 100% !important; 
-    font-size: var(--base-font-size); line-height: 1.6; padding-bottom: env(safe-area-inset-bottom);
-    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace;
-  }
+        .tab-add-btn {
+            background: transparent; border: none; color: #ccc;
+            font-size: 18px; padding: 0 15px; cursor: pointer;
+        }
+        .tab-add-btn:hover { color: white; background: #333; }
 
-  /* --- 工具列 --- */
-  .toolbar { 
-    display:flex; padding: 6px 8px; background: var(--bg-panel); gap: 6px; 
-    border-bottom:1px solid var(--border-color); position:sticky; top:0; z-index:10; 
-    flex-wrap:wrap; align-items:center; touch-action: manipulation;
-  }
+        /* --- 編輯器 --- */
+        .editor-container {
+            position: relative;
+            flex-grow: 1;
+            background: var(--bg-color);
+        }
 
-  .separator { width: 1px; height: 20px; background: var(--border-color); margin: 0 2px; flex-shrink: 0; }
+        textarea, pre {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            margin: 0; padding: 20px;
+            box-sizing: border-box;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: pre;
+            overflow: auto;
+            border: none;
+        }
 
-  .run-btn { 
-    height: var(--btn-size); min-width: var(--btn-size); padding: 0 8px; font-size: 14px;
-    border: 1px solid #333; border-radius: 6px; background: var(--btn-bg); color: var(--text-muted); 
-    cursor:pointer; flex-shrink:0; display: flex; align-items: center; justify-content: center;
-    transition: all 0.1s; outline: none; -webkit-tap-highlight-color: transparent;
-  }
-  .run-btn i { font-size: 18px; line-height: 1; }
-  .run-btn:hover { background: var(--btn-hover); color: #fff; border-color: #555; }
-  .run-btn:active { transform: translateY(1px); background: #111; }
+        textarea {
+            z-index: 2; color: transparent; background: transparent;
+            caret-color: white; outline: none; resize: none;
+        }
+        pre { z-index: 1; color: #d4d4d4; pointer-events: none; }
 
-  /* 搜尋欄 */
-  .search-bar { 
-    display:flex; align-items:center; gap: 4px; flex: 1; min-width: 180px; justify-content: flex-end; 
-    background: #111; padding: 2px; border-radius: 6px; border: 1px solid #333; margin-left: auto; position: relative;
-  }
-  .search-input { background: transparent; color: #fff; border: none; padding: 4px 8px; padding-right: 45px; font-size: 13px; width: 100%; min-width: 60px; }
-  .search-input:focus { outline:none; }
-  .search-count { position: absolute; right: 100px; font-size: 11px; color: #666; pointer-events: none; }
-  .search-bar .run-btn { border: none; background: transparent; min-width: 28px; height: 28px; width: 28px; padding: 0; }
-  .search-bar .run-btn:hover { background: #333; }
+        /* 語法亮高 CSS */
+        .hl-tag { color: var(--hl-tag); }
+        .hl-attr { color: var(--hl-attr); }
+        .hl-string { color: var(--hl-string); }
+        .hl-comment { color: var(--hl-comment); font-style: italic; }
+        .hl-keyword { color: var(--hl-keyword); }
+        .hl-number { color: var(--hl-number); }
+        .hl-bracket { color: #808080; }
 
-  /* 狀態與 Checkbox */
-  .save-status { width: 8px; height: 8px; border-radius: 50%; background: #555; margin: 0 8px; transition: background 0.3s; flex-shrink: 0; }
-  .save-status.saving { background: #f1fa8c; box-shadow: 0 0 5px #f1fa8c; }
-  .save-status.saved { background: #50fa7b; }
-  .shell-option { display:flex; align-items:center; font-size:12px; color: var(--text-muted); cursor:pointer; user-select:none; margin: 0 4px; padding: 0 4px; height: var(--btn-size); }
-  .shell-option input { margin-right: 4px; accent-color: var(--accent-color); }
+        /* --- 底部狀態列 --- */
+        .statusbar {
+            background: #007acc;
+            color: white;
+            padding: 3px 10px;
+            font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+        }
 
-  /* Scroll & Search Style */
-  .CodeMirror::-webkit-scrollbar { width:10px; height:10px; }
-  .CodeMirror::-webkit-scrollbar-track { background:#1e1e1e; }
-  .CodeMirror::-webkit-scrollbar-thumb { background:#6272a4; border-radius:5px; }
-  .cm-searching { background: rgba(255, 255, 0, 0.4); border-bottom: 1px solid yellow; }
-  .cm-active-search { background: rgba(255, 165, 0, 0.8) !important; color: #000 !important; outline: 2px solid #fff;}
-
-  /* RWD */
-  @media (max-width:600px){
-    .browser-container { margin: 0; border-radius: 0; height: 100vh; height: 100dvh; border:none; }
-    .toolbar { gap: 4px; padding: 4px; } 
-    .run-btn { min-width: 34px; height: 34px; }
-    .search-bar { order: 99; flex-basis: 100%; margin-top: 4px; }
-    .search-count { right: 110px; } 
-    .separator { height: 16px; margin: 0 1px; }
-  }
-
-  /* 拖曳樣式 */
-  .tab.dragging { opacity: 0.3; background: #444; }
-  .tab-ghost {
-      position: fixed; pointer-events: none; z-index: 9999; opacity: 0.9;
-      background: #333; color: #fff; padding: 8px 12px; border-radius: 6px;
-      box-shadow: 0 10px 20px rgba(0,0,0,0.5); border: 1px solid var(--accent-color);
-      font-size: 13px; display: flex; align-items: center; white-space: nowrap;
-      transform: translate(-50%, -50%) scale(1.05); -webkit-user-select: none;
-  }
-  body.is-dragging-mode * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-
-  /* 預覽視窗 */
-  #previewOverlay {
-      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-      background: #fff; z-index: 100; display: none; flex-direction: column;
-  }
-  #previewToolbar {
-      background: var(--bg-panel); padding: 8px; display: flex;
-      justify-content: space-between; align-items: center;
-      border-bottom: 1px solid #444; flex-shrink: 0;
-  }
-  #previewTitle { font-weight: bold; color: #fff; font-size: 14px; display: flex; align-items: center; gap: 6px;}
-  #closePreviewBtn {
-    background: transparent; color: var(--text-muted); border: none;
-    font-size: 20px; cursor: pointer; display: flex; align-items: center;
-  }
-  #closePreviewBtn:hover { color: #fff; }
-  #previewFrame { flex: 1; border: none; width: 100%; height: 100%; background: #fff; }
-
-  /* --- AES 加密彈窗 & 通用彈窗樣式 --- */
-  #encryptOverlay, #selectOverlay {
-      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.8); z-index: 200; 
-      display: none; align-items: center; justify-content: center;
-      backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
-  }
-  .encrypt-box {
-      background: #1e293b; border: 1px solid #334155; border-radius: 16px;
-      padding: 24px; 
-      width: 96%;           
-      max-width: 500px;     
-      box-shadow: 0 20px 50px rgba(0,0,0,0.6); color: #fff;
-      display: flex; flex-direction: column; gap: 16px;
-  }
-  .encrypt-box h3 { margin: 0; font-size: 18px; display: flex; align-items: center; gap: 8px; color: #fff; }
-  .encrypt-box label { font-size: 12px; color: #94a3b8; text-transform: uppercase; font-weight: 600; margin-bottom: -10px;}
-  
-  /* V22 Input 美化 */
-  .encrypt-input {
-      background: #0f172a; border: 2px solid #334155; color: #fff;
-      padding: 12px; border-radius: 8px; font-size: 14px; outline: none; transition: 0.2s;
-  }
-  .encrypt-input:focus { border-color: #6272a4; box-shadow: 0 0 0 3px rgba(98, 114, 164, 0.2); }
-
-  /* V22 選取行數專用樣式 */
-  .select-row { 
-      display: flex; align-items: center; justify-content: space-between; 
-      gap: 8px; 
-      margin: 10px 0;
-  }
-  .select-input { 
-      flex: 1; 
-      min-width: 0; 
-      text-align: center; font-size: 16px; background: #0f172a;
-      border: 2px solid #334155; border-radius: 8px; color: #fff; padding: 12px;
-      transition: 0.2s; 
-  }
-  .select-input:focus { border-color: #6272a4; box-shadow: 0 0 0 3px rgba(98, 114, 164, 0.2); outline: none; }
-  .select-sep { color: #6272a4; font-weight: bold; font-size: 18px; }
-  
-  .encrypt-actions { display: flex; gap: 10px; margin-top: 8px; }
-  .encrypt-btn {
-      flex: 1; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
-      font-size: 14px; font-weight: 600; cursor: pointer; transition: 0.2s;
-  }
-  .btn-confirm { background: #000; color: #fff; }
-  .btn-confirm:hover { background: #222; border-color: #fff; }
-  .btn-cancel { background: transparent; color: #94a3b8; border: 1px solid transparent; }
-  .btn-cancel:hover { color: #fff; background: rgba(255,255,255,0.05); }
-
-  /* --- Stealth Mode (隱形黑屏模式) --- */
-  #stealthOverlay {
-      display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
-      background: #000; z-index: 2147483647; /* 最大層級 */
-      cursor: none; pointer-events: auto; /* 攔截滑鼠點擊 */
-      touch-action: none;
-  }
-  #stealthUnlockZone {
-      position: absolute; top: 0; right: 0; width: 100px; height: 100px;
-      z-index: 2147483648; cursor: default;
-  }
-  #stealthInput {
-      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      opacity: 0; width: 1px; height: 1px; background: transparent; border: none;
-      outline: none; pointer-events: none; z-index: 2147483648; 
-  }
-
-  /* --- 手機版模擬右鍵選單 (V17 新增) --- */
-  #mobileContextMenu {
-      display: none; /* 預設隱藏 */
-      position: fixed; /* 固定定位，確保浮在最上層 */
-      z-index: 99999; /* 確保蓋過編輯器和鍵盤 */
-      background: #1f2937; /* 深色背景 */
-      border: 1px solid #374151;
-      border-radius: 8px;
-      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-      flex-direction: row; /* 水平排列 */
-      overflow: hidden;
-      white-space: nowrap;
-      backdrop-filter: blur(10px);
-  }
-
-  .ctx-item {
-      padding: 10px 16px; color: #f3f4f6; font-size: 14px; cursor: pointer;
-      border-right: 1px solid #374151; transition: background 0.2s;
-      user-select: none; -webkit-user-select: none;
-  }
-  .ctx-item:last-child { border-right: none; }
-  .ctx-item:active { background: #4b5563; }
-
-  /* --- ✨ Monaco Style Color Decorators (V21.3 Touch Fix) --- */
-  .cm-color-preview {
-      display: inline-block;
-      width: 1em; /* ✨ 加大寬度 */
-      height: 1em; /* ✨ 加大高度 */
-      margin-right: 0.4em;
-      border: 2px solid rgba(255,255,255,0.4); /* ✨ 加粗邊框 */
-      border-radius: 3px;
-      vertical-align: middle;
-      transform: translateY(-0.1em);
-      
-      /* ✨ 關鍵：確保它可以被點擊 */
-      pointer-events: auto;
-      cursor: pointer; 
-      
-      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
-  }
-
-  /* --- ✨ 新增：選色視窗專用樣式 (V21.2) --- */
-  #colorPickerOverlay {
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.8); z-index: 300; /* 比一般彈窗高 */
-    display: none; align-items: center; justify-content: center;
-    backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
-  }
-
-  /* --- ✨ 括號匹配高亮樣式 (NEW) --- */
-  .CodeMirror-matchingbracket { 
-      border: 1px solid #50fa7b !important; /* 綠色邊框 */
-      color: #fff !important; 
-      background-color: rgba(80, 250, 123, 0.2); /* 淡淡的綠色背景 */
-  }
-  .CodeMirror-nonmatchingbracket { 
-      border: 1px solid #ff5555 !important; /* 如果括號不對稱，顯示紅色 */
-      background-color: rgba(255, 85, 85, 0.2);
-  }
-</style>
+        /* --- 右鍵選單 (Context Menu) --- */
+        #context-menu {
+            position: absolute;
+            display: none;
+            background: #252526;
+            border: 1px solid #454545;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+            z-index: 1000;
+            min-width: 150px;
+            padding: 5px 0;
+            border-radius: 4px;
+        }
+        .menu-item {
+            padding: 8px 15px;
+            font-size: 13px;
+            color: #cccccc;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .menu-item:hover { background: #094771; color: white; }
+        
+        /* Google Picker 背景遮罩加深 */
+        .picker-dialog-bg { background-color: rgba(0,0,0,0.85) !important; }
+    </style>
 </head>
 <body>
 
-<div class="browser-container">
-  <div class="tabs" id="tabBar">
-    <button id="newTabBtn" title="新增分頁"><i class="ri-add-line"></i></button>
-  </div>
-
-  <div class="toolbar">
-    <button class="run-btn" onclick="editorUndo()" title="復原"><i class="ri-arrow-go-back-line"></i></button>
-    <button class="run-btn" onclick="editorRedo()" title="重做"><i class="ri-arrow-go-forward-line"></i></button>
-    
-    <div class="separator"></div>
-
-    <button class="run-btn" onclick="formatCode()" title="排版程式碼"><i class="ri-magic-line"></i></button>
-    <button class="run-btn" onclick="changeFontSize(1)" title="放大字體"><i class="ri-zoom-in-line"></i></button>
-    <button class="run-btn" onclick="changeFontSize(-1)" title="縮小字體"><i class="ri-zoom-out-line"></i></button>
-    <button class="run-btn" onclick="openSelectModal()" title="選取指定行數">
-        <i class="ri-list-check-2"></i>
-    </button>
-    <button class="run-btn" onclick="insertTemplate()" title="插入 HTML5 骨架"><i class="ri-file-code-line"></i></button>
-
-    <button class="run-btn" onclick="openEncryptModal()" title="加密封裝 (AES Vault)">
-        <i class="ri-file-lock-line"></i>
-    </button>
-    <div class="separator"></div>
-
-    <button class="run-btn" onclick="openFile()" title="開啟檔案"><i class="ri-folder-open-line"></i></button>
-    <button class="run-btn" onclick="downloadHTML()" title="下載原始碼"><i class="ri-download-line"></i></button>
-
-<button class="run-btn" onclick="saveToGoogleDrive()" title="儲存到 Google雲端硬碟">
-    <i class="ri-google-drive-fill"></i>
-</button>
-
-    <button class="run-btn" onclick="copyHTML()" title="複製程式碼"><i class="ri-file-copy-line"></i></button>
-    <button class="run-btn" onclick="pasteHTML()" title="貼上"><i class="ri-clipboard-line"></i></button>
-    <button class="run-btn" onclick="clearHTML()" title="清空"><i class="ri-delete-bin-line"></i></button>
-	<button class="run-btn" onclick="runHTML()" title="執行程式"><i class="ri-play-fill"></i></button>
-    <label class="shell-option" title="開啟 Console Shell">
-        <input type="checkbox" id="useConsole" checked> 
-        Shell
-    </label>
-    <label class="shell-option" title="匿蹤">
-        <input type="checkbox" id="stealthModeToggle"> 
-        Hide
-    </label>
-    <div id="saveStatus" class="save-status" title="存檔狀態"></div>
-    <input type="file" id="fileInput" style="display:none" accept=".html,.css,.js,.txt,.json,.md,.htm">
-
-    <div class="search-bar">
-      <input type="text" id="searchInput" class="search-input" placeholder="搜尋..." autocomplete="off">
-      <span id="searchCount" class="search-count"></span>
-      
-      <button class="run-btn" onclick="findPrev()" title="上一個"><i class="ri-arrow-up-s-line"></i></button>
-      <button class="run-btn" onclick="findNext()" title="下一個"><i class="ri-arrow-down-s-line"></i></button>
-      <div style="width:1px;height:16px;background:#333;margin:0 2px;"></div>
-      <button class="run-btn" onclick="toggleFullScreen()" title="全螢幕"><i class="ri-fullscreen-line"></i></button>
+    <div class="toolbar">
+        <button id="auth-btn" class="btn btn-blue" onclick="toggleAuth()">🔑 登入 Google</button>
+        <div class="divider"></div>
+        <button id="save-btn" class="btn" onclick="saveToDrive()" disabled>☁️ 雲端儲存 (選位置)</button>
+        <button id="open-btn" class="btn" onclick="openFromDrive()" disabled>📂 雲端開啟</button>
+        <div class="divider"></div>
+        <button class="btn" onclick="executeCode()">▶️ 執行</button>
+        <button class="btn" onclick="copyCode()">📋 複製</button>
+        <button class="btn" onclick="clearCode()">🗑️ 清空</button>
     </div>
-  </div>
 
-  <div class="editor-container">
-    <div id="editorWrapper"></div>
-  </div>
-
-  <div id="previewOverlay">
-      <div id="previewToolbar">
-          <span id="previewTitle">Preview Output</span>
-          <button id="closePreviewBtn" onclick="closePreview()"><i class="ri-close-circle-line"></i></button>
-      </div>
-      <iframe id="previewFrame"></iframe>
-  </div>
-
-<div id="encryptOverlay">
-      <div class="encrypt-box">
-          <h3><i class="ri-lock-2-line"></i> AES Secure Vault</h3>
-          <p style="font-size:12px; color:#94a3b8; margin-top:-8px;">將當前程式碼封裝為單一加密網頁</p>
-          
-          <label>1. 頁面標題 (Title)</label>
-          <input type="text" id="encTitle" class="encrypt-input" placeholder="My Secret App">
-          
-          <label>2. 帳號 / 用戶名 (Account)</label>
-          <input type="text" id="encAccount" class="encrypt-input" placeholder="設定帳號 (作為第二金鑰)..." autocomplete="off">
-          
-          <label>3. 設定密碼 (Password)</label>
-          <input type="password" id="encPass" class="encrypt-input" placeholder="設定解鎖密碼..." autocomplete="new-password">
-          
-          <div class="encrypt-actions">
-              <button class="encrypt-btn btn-cancel" onclick="closeEncryptModal()">取消</button>
-              <button class="encrypt-btn btn-confirm" onclick="processEncryption()">加密並下載</button>
-          </div>
-      </div>
-  </div>
-
-</div>
-
-<div id="stealthOverlay">
-    <input type="text" id="stealthInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
-    <div id="stealthUnlockZone" title="Double Click to Unlock"></div>
-</div>
-
-<div id="selectOverlay">
-    <div class="encrypt-box" id="selectModalBox">
-        <h3><i class="ri-cursor-text"></i> 選取行數 (Select Lines)</h3>
-        <p style="font-size:12px; color:#94a3b8; margin-top:-8px;">輸入起始與結束行號進行選取</p>
-        <div class="select-row">
-            <input type="number" inputmode="numeric" id="lineStart" class="select-input" placeholder="Start">
-            <span class="select-sep">~</span>
-            <input type="number" inputmode="numeric" id="lineEnd" class="select-input" placeholder="End">
-        </div>
-        <div class="encrypt-actions">
-            <button class="encrypt-btn btn-cancel" onclick="closeSelectModal()">取消</button>
-            <button class="encrypt-btn btn-confirm" onclick="applyLineSelection()">確定</button>
-        </div>
+    <div class="tabs-bar">
+        <div id="tabs-container" style="display:flex;"></div>
+        <button class="tab-add-btn" onclick="addNewTab()">+</button>
     </div>
-</div>
 
-<div id="colorPickerOverlay">
-    <div class="encrypt-box">
-        <h3><i class="ri-palette-line"></i> 選擇顏色 (Color Picker)</h3>
-        <p style="font-size:12px; color:#94a3b8; margin-top:-8px;">點擊左側色塊開啟系統選色盤</p>
-        
-        <div style="display:flex; gap:15px; align-items:center; margin:15px 0;">
-            <input type="color" id="modalNativeColor" style="width:50px; height:50px; border:2px solid #555; border-radius:8px; padding:0; background:none; cursor:pointer;">
-            
-            <input type="text" id="modalHexInput" class="encrypt-input" style="flex:1; font-family:monospace; text-transform:uppercase; font-size: 16px;" placeholder="#FFFFFF">
-        </div>
-
-        <div class="encrypt-actions">
-            <button class="encrypt-btn btn-cancel" onclick="closeColorModal()">取消</button>
-            <button class="encrypt-btn btn-confirm" onclick="applyColorModal()">確定套用</button>
-        </div>
+    <div class="editor-container">
+        <pre id="highlighting"></pre>
+        <textarea id="editor" spellcheck="false" placeholder="在此輸入程式碼..."></textarea>
     </div>
-</div>
 
-<div id="mobileContextMenu">
-    <div class="ctx-item" onclick="execCmd('copy')">複製</div>
-    <div class="ctx-item" onclick="execCmd('cut')">剪下</div>
-    <div class="ctx-item" onclick="execCmd('delete')">刪除</div>
-</div>
+    <div class="statusbar">
+        <span id="status-text">系統就緒</span>
+        <span id="file-name">index.html</span>
+    </div>
 
-<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.15/lib/codemirror.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.15/addon/search/searchcursor.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.15/addon/edit/closebrackets.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.15/addon/edit/matchbrackets.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.15/addon/edit/closetag.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.15/addon/fold/xml-fold.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.15/addon/edit/matchtags.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.15/mode/htmlmixed/htmlmixed.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.15/mode/javascript/javascript.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.15/mode/css/css.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.15/mode/xml/xml.js"></script>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="https://apis.google.com/js/api.js" async defer></script>
+    <div id="context-menu">
+        <div class="menu-item" onclick="renameCurrentTab()">✏️ 重命名</div>
+        <div class="menu-item" onclick="closeCurrentTab()">❌ 關閉分頁</div>
+        <div style="height:1px; background:#444; margin:4px 0;"></div>
+        <div class="menu-item" onclick="saveToDrive()">☁️ 上傳此檔案</div>
+    </div>
 
 <script>
-// ✨ 全局變數
-let tabs = [];
-let currentTab = -1;
-const editorWrapper = document.getElementById("editorWrapper");
-const searchInput = document.getElementById("searchInput");
-const searchCount = document.getElementById("searchCount");
-const tabBar = document.getElementById("tabBar");
-const saveStatus = document.getElementById("saveStatus");
-let searchCursor = null;
+    // === 設定與變數 ===
+    const CLIENT_ID = '141704125172-2ntkus080b4cm4pi10s9koalp7utdere.apps.googleusercontent.com';
+    const API_KEY = 'AIzaSyCUo6FSo2LDrsc7sypAuW7JwwGrUKLceuY';
+    const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile';
 
-// ✨ 拖曳相關
-let isDraggingMobile = false;
-let draggedTab = null;
-let ghostTab = null; 
-let touchTimer = null;
-let startX = 0;
-let startY = 0;
-const DRAG_THRESHOLD = 8; 
+    let tokenClient, accessToken = null, pickerApiLoaded = false;
+    let files = [{ name: 'index.html', content: '' }];
+    let activeIndex = 0;
+    let contextMenuTargetIndex = -1; // 記錄右鍵點擊的是哪個分頁
 
-const isAndroid = /Android/i.test(navigator.userAgent);
-let currentFontSize = 14;
+    const editor = document.getElementById('editor');
+    const highlighting = document.getElementById('highlighting');
+    const statusText = document.getElementById('status-text');
+    const contextMenu = document.getElementById('context-menu');
 
-// --- ✨ 新版選色視窗邏輯 (V21.2 Custom Modal) ---
-const colorOverlay = document.getElementById("colorPickerOverlay");
-const modalNativeColor = document.getElementById("modalNativeColor");
-const modalHexInput = document.getElementById("modalHexInput");
-let activeColorRange = null; // 暫存當前編輯的範圍
+    // === Google API 核心 ===
+    function showStatus(msg) { statusText.textContent = msg; setTimeout(()=>statusText.textContent='就緒', 4000); }
 
-// 1. 綁定連動：選色盤變動 -> 更新文字框
-modalNativeColor.addEventListener("input", (e) => { 
-    modalHexInput.value = e.target.value.toUpperCase(); 
-});
-
-// 2. 綁定連動：文字框變動 -> 更新選色盤 (如果格式正確)
-modalHexInput.addEventListener("input", (e) => {
-    const val = e.target.value;
-    if(val.match(/^#[0-9a-fA-F]{6}$/)) {
-        modalNativeColor.value = val;
+    async function initGoogle() {
+        tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID, scope: SCOPES,
+            callback: (resp) => {
+                if(resp.error) return;
+                accessToken = resp.access_token;
+                updateAuthUI(true);
+                showStatus('登入成功');
+            }
+        });
+        await new Promise(r => gapi.load('client:picker', r));
+        await gapi.client.init({ apiKey: API_KEY, discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'] });
+        pickerApiLoaded = true;
     }
-});
 
-// 開啟視窗
-function openColorModal(colorStr, startPos, endPos) {
-    activeColorRange = { from: startPos, to: endPos };
-    
-    // 初始化數值
-    if (colorStr.startsWith("#") && colorStr.length === 7) {
-        modalNativeColor.value = colorStr;
-        modalHexInput.value = colorStr;
-    } else {
-        // 如果是 rgb() 或其他格式，預設先給黑色 (或保留原字串在文字框)
-        modalNativeColor.value = "#000000"; 
-        modalHexInput.value = colorStr;
+    function toggleAuth() {
+        if(!accessToken) tokenClient.requestAccessToken({ prompt: 'consent' });
+        else { accessToken = null; updateAuthUI(false); showStatus('已登出'); }
     }
-    
-    colorOverlay.style.display = "flex";
-}
 
-// 關閉視窗
-function closeColorModal() { 
-    colorOverlay.style.display = "none"; 
-    activeColorRange = null; 
-}
-
-// 確定套用顏色
-function applyColorModal() {
-    if (!activeColorRange || currentTab < 0) return;
-    const newColor = modalHexInput.value;
-    const editor = tabs[currentTab].editor;
-    
-    editor.operation(() => {
-        editor.replaceRange(newColor, activeColorRange.from, activeColorRange.to);
-    });
-    
-    closeColorModal();
-    // 強制刷新一次預覽
-    setTimeout(() => updateColorDecorators(editor), 100);
-}
-
-// ✨ V21.3 修改後的渲染函式：點擊色塊 -> 開啟自定義視窗
-function updateColorDecorators(cm) {
-    if (cm._colorBookmarks) {
-        cm._colorBookmarks.forEach(b => b.clear());
+    function updateAuthUI(isLogin) {
+        document.getElementById('auth-btn').textContent = isLogin ? '🚪 登出' : '🔑 登入 Google';
+        document.getElementById('save-btn').disabled = !isLogin;
+        document.getElementById('open-btn').disabled = !isLogin;
     }
-    cm._colorBookmarks = [];
 
-    const text = cm.getValue();
-    let match;
-    // 重置正則
-    const colorRegex = /#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})\b|rgba?\([\d\s,.]+\)|hsla?\([\d\s,.%]+\)/g;
+    // === 雲端功能 (含資料夾選擇) ===
+    function saveToDrive() {
+        if(!accessToken) return;
+        const view = new google.picker.DocsView(google.picker.ViewId.FOLDERS)
+            .setSelectFolderEnabled(true)
+            .setMimeTypes('application/vnd.google-apps.folder');
+        
+        const picker = new google.picker.PickerBuilder()
+            .addView(view)
+            .setOAuthToken(accessToken)
+            .setDeveloperKey(API_KEY)
+            .setTitle('請選擇儲存資料夾')
+            .setCallback(async (data) => {
+                if (data.action === google.picker.Action.PICKED) {
+                    const folderId = data.docs[0].id;
+                    await uploadFile(folderId, data.docs[0].name);
+                }
+            }).build();
+        picker.setVisible(true);
+    }
 
-    cm.operation(() => {
-        while ((match = colorRegex.exec(text)) !== null) {
-            const colorStr = match[0];
-            const startPos = cm.posFromIndex(match.index);
-            const endPos = cm.posFromIndex(match.index + colorStr.length);
+    async function uploadFile(folderId, folderName) {
+        showStatus(`正在上傳至 ${folderName}...`);
+        const targetIndex = contextMenuTargetIndex !== -1 ? contextMenuTargetIndex : activeIndex;
+        const file = files[targetIndex];
+        const content = (targetIndex === activeIndex) ? editor.value : file.content;
 
-            const node = document.createElement("span");
-            node.className = "cm-color-preview";
-            node.style.backgroundColor = colorStr;
+        const metadata = { name: file.name, mimeType: 'text/html', parents: [folderId] };
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        form.append('file', new Blob([content], { type: 'text/html' }));
+
+        try {
+            await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+                method: 'POST', headers: { 'Authorization': `Bearer ${accessToken}` }, body: form
+            });
+            showStatus('✅ 儲存成功！');
+        } catch(e) { showStatus('❌ 儲存失敗'); }
+        contextMenuTargetIndex = -1; // 重置
+    }
+
+    function openFromDrive() {
+        if(!accessToken) return;
+        const picker = new google.picker.PickerBuilder()
+            .addView(new google.picker.DocsView().setMimeTypes('text/html,text/plain'))
+            .setOAuthToken(accessToken)
+            .setDeveloperKey(API_KEY)
+            .setCallback(async (data) => {
+                if(data.action === google.picker.Action.PICKED) {
+                    const id = data.docs[0].id;
+                    const name = data.docs[0].name;
+                    showStatus('下載中...');
+                    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media`, {
+                        headers: { 'Authorization': `Bearer ${accessToken}` }
+                    });
+                    const text = await res.text();
+                    
+                    // 新增分頁並載入
+                    files.push({ name: name, content: text });
+                    switchTab(files.length - 1);
+                    showStatus(`已開啟 ${name}`);
+                }
+            }).build();
+        picker.setVisible(true);
+    }
+
+    // === 分頁系統 (右鍵選單核心) ===
+    function renderTabs() {
+        const container = document.getElementById('tabs-container');
+        container.innerHTML = '';
+        files.forEach((file, idx) => {
+            const div = document.createElement('div');
+            div.className = `tab ${idx === activeIndex ? 'active' : ''}`;
+            div.textContent = file.name;
             
-            // ✨ V21.3 關鍵修改：
-            // 1. 同時監聽 click 和 touchend
-            // 2. 加上 preventDefault 防止手機誤觸為「移動游標」
-            const handleClick = (e) => {
-                e.stopPropagation(); 
-                e.preventDefault(); 
-                openColorModal(colorStr, startPos, endPos);
-                return false;
+            // 左鍵：切換分頁
+            div.onclick = () => switchTab(idx);
+
+            // 右鍵：開啟選單
+            div.oncontextmenu = (e) => {
+                e.preventDefault();
+                contextMenuTargetIndex = idx; // 鎖定操作目標
+                showContextMenu(e.pageX, e.pageY);
             };
 
-            node.onclick = handleClick;
-            node.ontouchend = handleClick; // 手機優先觸發這個
-
-            const bookmark = cm.setBookmark(startPos, { 
-                widget: node, 
-                handleMouseEvents: true 
-            });
-            cm._colorBookmarks.push(bookmark);
-        }
-    });
-}
-
-// --- 預覽視窗控制 ---
-const previewOverlay = document.getElementById("previewOverlay");
-const previewFrame = document.getElementById("previewFrame");
-
-async function closePreview() {
-    try {
-        const win = previewFrame.contentWindow;
-        if (win && win.__errorBuffer && win.__errorBuffer.length > 0) {
-            const errorText = win.__errorBuffer.join('\n');
-            await navigator.clipboard.writeText(errorText);
-            alert(`已自動複製 ${win.__errorBuffer.length} 條不重複的錯誤訊息！`);
-        }
-    } catch (e) {}
-    previewOverlay.style.display = "none";
-    previewFrame.srcdoc = "";
-}
-
-// --- AES 加密模組整合 ---
-const encryptOverlay = document.getElementById('encryptOverlay');
-const encTitle = document.getElementById('encTitle');
-const encAccount = document.getElementById('encAccount'); // 新增變數
-const encPass = document.getElementById('encPass');
-
-function openEncryptModal() {
-    if(currentTab < 0) return alert("請先建立或開啟一個檔案");
-    // 預填標題
-    encTitle.value = tabs[currentTab].name || "Encrypted Page";
-    encAccount.value = ""; // 重置帳號
-    encPass.value = "";    // 重置密碼
-    encryptOverlay.style.display = "flex";
-    encAccount.focus();    // 聚焦在第一個輸入框
-}
-
-function closeEncryptModal() {
-    encryptOverlay.style.display = "none";
-}
-
-function processEncryption() {
-    const account = encAccount.value.trim();
-    const pass = encPass.value;
-    const title = encTitle.value || "Secured Document";
-    
-    if (!account) return alert("錯誤：請設定帳號 (Account)");
-    if (!pass) return alert("錯誤：請設定加密密碼");
-    
-    // 獲取當前編輯器內容
-    const content = tabs[currentTab].editor.getValue();
-    if (!content.trim()) return alert("錯誤：檔案內容為空");
-
-    try {
-        // ✨ 核心修改：將 帳號 + 密碼 組合為最終金鑰
-        const finalKey = account + pass;
-        
-        // 加密內容
-        const encrypted = CryptoJS.AES.encrypt(content, finalKey).toString();
-        
-        // 生成包含解密邏輯的 HTML (傳入標題與加密資料)
-        const finalHtml = getDecryptionTemplate(title, encrypted);
-        
-        // 下載
-        const blob = new Blob([finalHtml], { type: "text/html" });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = "index.html";
-        link.click();
-        
-        closeEncryptModal();
-        alert("加密成功！檔案已下載。\n解鎖時需同時輸入帳號與密碼。");
-    } catch (err) {
-        alert("加密失敗：" + err.message);
-    }
-}
-
-// ✨ 生成解密頁面 (包含帳號輸入框的全新模板)
-function getDecryptionTemplate(title, encryptedData) {
-    return `<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-<link id="favicon" rel="icon" href="" />
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>${title}</title>
-<script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js"><\/script>
-<style>
-  :root { --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --accent: #6272a4; }
-  body, html { margin:0; padding:0; width:100%; height:100%; background:var(--bg); font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow:hidden; display:flex; justify-content:center; align-items:center; color: var(--text); }
-  #auth-container { position: relative; width: 90%; max-width: 380px; background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); padding: 40px 30px; border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1); text-align: center; transition: all 0.5s ease; }
-  h2 { margin: 10px 0 5px; font-weight: 700; letter-spacing: 1px; color:#fff; }
-  p.hint { margin: 0 0 25px; font-size: 13px; color: #94a3b8; }
-  input { width: 100%; padding: 15px; margin-bottom: 12px; border-radius: 12px; border: 2px solid #334155; background: #0b1120; color: #fff; font-size: 16px; text-align: center; box-sizing: border-box; transition: 0.3s; font-family: monospace; }
-  input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px rgba(98, 114, 164, 0.2); }
-  button { width: 100%; padding: 15px; margin-top: 10px; border: 1px solid rgba(255,255,255,0.2); border-radius: 12px; background: #000; color: white; font-size: 16px; font-weight: 600; cursor: pointer; transition: 0.3s; }
-  button:hover { background: #222; border-color: #fff; transform: translateY(-2px); }
-  #msg { height: 20px; margin-top: 15px; font-size: 13px; color: #ff5555; opacity: 0; transition: opacity 0.3s; font-weight:bold; }
-  .shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
-  @keyframes shake { 10%, 90% { transform: translate3d(-1px, 0, 0); } 20%, 80% { transform: translate3d(2px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); } }
-</style>
-</head>
-<body>
-<div id="auth-container">
-  <div style="margin-bottom: 15px;">
-    <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#6272a4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-  </div>
-  <h2>LOCKED</h2>
-  <p class="hint">Enter credentials to decrypt</p>
-  
-  <input type="text" id="account" placeholder="Account" autocomplete="username">
-  <input type="password" id="pass" placeholder="Password" autocomplete="current-password">
-  
-  <button onclick="unlock()">UNLOCK</button>
-  <div id="msg">Incorrect Credentials</div>
-</div>
-
-<script>
-  const encrypted = "${encryptedData}";
-  
-  function unlock() {
-      const acc = document.getElementById('account').value.trim();
-      const pwd = document.getElementById('pass').value;
-      const msg = document.getElementById('msg');
-      const box = document.getElementById('auth-container');
-      
-      if(!acc || !pwd) {
-          msg.innerText = "Please fill all fields";
-          msg.style.opacity = 1;
-          box.classList.add('shake');
-          setTimeout(() => box.classList.remove('shake'), 500);
-          return;
-      }
-
-      try {
-          // 嘗試解密 (Key = Account + Password)
-          const decrypted = CryptoJS.AES.decrypt(encrypted, acc + pwd);
-          const str = decrypted.toString(CryptoJS.enc.Utf8);
-          
-          if (str && str.length > 0) {
-              document.open();
-              document.write(str);
-              document.close();
-          } else {
-              throw new Error("Empty");
-          }
-      } catch (e) {
-          msg.innerText = "Access Denied";
-          msg.style.opacity = 1;
-          box.classList.add('shake');
-          setTimeout(() => box.classList.remove('shake'), 500);
-          document.getElementById('pass').value = '';
-      }
-  }
-
-  // 綁定 Enter 鍵
-  document.getElementById('pass').addEventListener('keypress', function (e) {
-      if (e.key === 'Enter') unlock();
-  });
-  document.getElementById('account').addEventListener('keypress', function (e) {
-      if (e.key === 'Enter') document.getElementById('pass').focus();
-  });
-      const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = 64;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, 64, 64); // 全透明
-    document.getElementById('favicon').href = canvas.toDataURL();
-<\/script>
-</body>
-</html>`;
-}
-
-// --- 一般功能 ---
-function runHTML(){
-  if(currentTab<0) return;
-  let html = tabs[currentTab].editor.getValue();
-  const useConsole = document.getElementById("useConsole").checked;
-  const iconCss = '<link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">';
-
-  let toolsScript = getMinimalErrorLoggerScript();
-  if (useConsole) { toolsScript += getConsoleScript(); }
-  
-  if (html.includes("<head>")) { html = html.replace("<head>", "<head>" + iconCss); } else { html = iconCss + html; }
-  if (html.includes("<body")) { html = html.replace(/<body[^>]*>/i, (match) => match + toolsScript); } else { html = toolsScript + html; }
-
-  previewOverlay.style.display = "flex";
-  const doc = previewFrame.contentDocument || previewFrame.contentWindow.document;
-  doc.open(); doc.write(html); doc.close();
-}
-
-function getMinimalErrorLoggerScript() {
-  return `<script>(function(){if (!window.__errorBuffer) { window.__errorBuffer = []; } const originalError = console.error; console.error = function(...args) { try { const errorStr = args.map(a => { if (a instanceof Error) return a.stack || a.message; if (typeof a === 'object') return JSON.stringify(a); return String(a); }).join(' '); if (errorStr && !window.__errorBuffer.includes(errorStr)) { window.__errorBuffer.push(errorStr); } } catch(e) {} originalError.apply(console, args); }; const originalOnError = window.onerror; window.onerror = function(msg, url, line, col, error) { const errorStr = msg + ' (Line: ' + line + ')'; if (!window.__errorBuffer.includes(errorStr)) { window.__errorBuffer.push(errorStr); } if (originalOnError) { return originalOnError.apply(window, arguments); } return false; }; window.addEventListener('unhandledrejection', function(event) { const errorStr = 'Unhandled Promise Rejection: ' + (event.reason ? (event.reason.stack || event.reason) : 'Unknown'); if (!window.__errorBuffer.includes(errorStr)) { window.__errorBuffer.push(errorStr); } }); })();<\/script>`;
-}
-
-function getConsoleScript() {
-  return `<div id="v-console-container" style="position:fixed;bottom:0;left:0;right:0;height:220px;background:#1e1e1e;color:#fff;z-index:999999;border-top:2px solid #6272a4;display:flex;flex-direction:column;font-family:monospace;font-size:13px;transition:transform 0.3s;transform:translateY(0);"><div style="background:#2c2c2c;height:32px;padding:0 8px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #444;flex-shrink:0;white-space:nowrap;overflow:hidden;"><span style="color: white;font-weight:bold;">Console Output</span><div style="display:flex;align-items:center;"><button onclick="document.getElementById('v-console-logs').innerHTML=''" title="Clear Log" style="background:#444;color:#fff;border:none;padding:0;width:28px;height:24px;cursor:pointer;margin-right:8px;border-radius:4px;display:flex;align-items:center;justify-content:center;"><i class="ri-delete-bin-line"></i></button><button onclick="document.getElementById('v-console-container').style.transform='translateY(185px)'" title="Minimize" style="background:#444;color:#fff;border:none;padding:0;width:28px;height:24px;cursor:pointer;border-radius:4px;display:flex;align-items:center;justify-content:center;"><i class="ri-arrow-down-s-line" style="font-size:16px;"></i></button><button onclick="document.getElementById('v-console-container').style.transform='translateY(0)'" title="Maximize" style="background:#444;color:#fff;border:none;padding:0;width:28px;height:24px;cursor:pointer;border-radius:4px;margin-left:4px;display:flex;align-items:center;justify-content:center;"><i class="ri-arrow-up-s-line" style="font-size:16px;"></i></button></div></div><div id="v-console-logs" style="flex:1;overflow-y:auto;padding:8px;background:rgba(0,0,0,0.3);"></div><div style="border-top:1px solid #444;display:flex;background:#2c2c2c;padding:4px;flex-shrink:0;align-items:center;"><span style="color:#50fa7b;margin-right:4px;font-weight:bold;">&gt;</span><input type="text" id="v-console-input" autocomplete="off" placeholder="Run JS..." style="flex:1;background:transparent;border:none;color:#fff;font-family:monospace;outline:none;min-width:0;"><button id="v-console-run-btn" title="Run" style="background:#444;color:#fff;border:none;padding:0;width:32px;height:24px;margin-left:4px;border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;"><i class="ri-play-fill"></i></button></div></div><script>(function(){if (!window.__errorBuffer) { window.__errorBuffer = []; } const logContainer = document.getElementById('v-console-logs'); const input = document.getElementById('v-console-input'); const runBtn = document.getElementById('v-console-run-btn'); function formatArg(arg) { if (arg === null) return 'null'; if (arg === undefined) return 'undefined'; if (typeof arg === 'object') { try { return JSON.stringify(arg, null, 2); } catch(e) { return String(arg); } } return String(arg); } function appendLog(type, args) { const div = document.createElement('div'); div.style.borderBottom = '1px solid #333'; div.style.padding = '2px 0'; div.style.wordBreak = 'break-all'; if(type === 'error') div.style.color = '#ff5555'; else if(type === 'warn') div.style.color = '#f1fa8c'; else if(type === 'command') div.style.color = '#8be9fd'; else if(type === 'result') div.style.color = '#bd93f9'; else div.style.color = '#f8f8f2'; let msgContent = args.map(formatArg).join(' '); if (type === 'error') { if (!window.__errorBuffer.includes(msgContent)) { window.__errorBuffer.push(msgContent); } } let msg = ''; if (type === 'command') msg = '> ' + args[0]; else if (type === 'result') msg = '< ' + formatArg(args[0]); else msg = '[' + type.toUpperCase() + '] ' + msgContent; div.textContent = msg; logContainer.appendChild(div); logContainer.scrollTop = logContainer.scrollHeight; } const originalLog = console.log; const originalError = console.error; const originalWarn = console.warn; console.log = function(...args) { appendLog('log', args); originalLog.apply(console, args); }; console.error = function(...args) { appendLog('error', args); originalError.apply(console, args); }; console.warn = function(...args) { appendLog('warn', args); originalWarn.apply(console, args); }; let cmdHistory = []; let historyIdx = -1; function executeCommand() { const cmd = input.value; if (!cmd) return; cmdHistory.push(cmd); historyIdx = cmdHistory.length; appendLog('command', [cmd]); try { const result = window.eval(cmd); appendLog('result', [result]); } catch (err) { appendLog('error', [err]); } input.value = ''; } runBtn.onclick = executeCommand; input.addEventListener('keydown', function(e) { if (e.key === 'Enter') { executeCommand(); } else if (e.key === 'ArrowUp') { if (historyIdx > 0) { historyIdx--; this.value = cmdHistory[historyIdx]; } } else if (e.key === 'ArrowDown') { if (historyIdx < cmdHistory.length - 1) { historyIdx++; this.value = cmdHistory[historyIdx]; } else { historyIdx = cmdHistory.length; this.value = ''; } } }); })();<\/script>`;
-}
-
-// --- DB Logic ---
-let db;
-const DB_NAME = "DevHtmlDB";
-const STORE_NAME = "tabs_v2"; 
-const DB_VERSION = 2; 
-
-function initDB() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-        request.onupgradeneeded = (e) => {
-            const db = e.target.result;
-            if (db.objectStoreNames.contains("tabs")) { db.deleteObjectStore("tabs"); }
-            if (!db.objectStoreNames.contains(STORE_NAME)) { db.createObjectStore(STORE_NAME, { keyPath: "id" }); }
-        };
-        request.onsuccess = (e) => { db = e.target.result; resolve(db); };
-        request.onerror = (e) => reject(e.target.error);
-    });
-}
-
-let saveTimer = null;
-function saveTabsToStorage() {
-    saveStatus.classList.remove("saved");
-    saveStatus.classList.add("saving");
-    if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-        if (!db) return;
-        if (currentTab >= 0 && tabs[currentTab] && tabs[currentTab].editor) {
-            tabs[currentTab].content = tabs[currentTab].editor.getValue();
-            tabs[currentTab].history = tabs[currentTab].editor.getHistory();
-        }
-        const saveData = {
-            id: 'auto-save-session',
-            data: tabs.map(t => ({ name: t.name, content: t.content, history: t.history }))
-        };
-        const transaction = db.transaction([STORE_NAME], "readwrite");
-        const store = transaction.objectStore(STORE_NAME);
-        store.put(saveData).onsuccess = () => {
-            saveStatus.classList.remove("saving");
-            saveStatus.classList.add("saved");
-            setTimeout(() => saveStatus.classList.remove("saved"), 1000); 
-        };
-    }, 200); 
-}
-
-async function loadTabsFromStorage() {
-    try {
-        await initDB();
-        const transaction = db.transaction([STORE_NAME], "readonly");
-        const store = transaction.objectStore(STORE_NAME);
-        store.get('auto-save-session').onsuccess = (e) => {
-            const result = e.target.result;
-            if (result && result.data && result.data.length > 0) {
-                tabs = []; editorWrapper.innerHTML = ""; document.querySelectorAll(".tab").forEach(e => e.remove());
-                result.data.forEach(d => addTab(d.name, d.content, d.history, false));
-                switchTab(0);
-            } else {
-                addTab("Template", "<!DOCTYPE html>\n<html>\n<head>\n<title>My Page</title>\n<style>\n  body { color: white; background: #222; font-family: sans-serif; padding: 20px; }\n  h1 { color: #ff5555; }\n</style>\n</head>\n<body>\n  <h1>Hello World</h1>\n  <script>\n    console.log('Ready');\n  <\/script>\n</body>\n</html>", null);
-            }
-        };
-    } catch (err) { addTab("Error", "DB Fail"); }
-}
-
-function createEditor(content='', history=null){
-  const e = CodeMirror(editorWrapper,{
-    value: content, mode: 'htmlmixed', theme: 'dracula', lineNumbers: true, 
-    lineWrapping: true, indentUnit: 4, tabSize: 4, indentWithTabs: true,
-    inputStyle: 'contenteditable', 
-    spellcheck: false, autocorrect: false, autocapitalize: false,
-    smartIndent: false, electricChars: false, 
-    matchBrackets: true, // ✨ 新增：啟用括號匹配
-    autoCloseBrackets: isAndroid ? false : "()[]{}''\"\"", 
-    autoCloseTags: true, matchTags: {bothTags: true},
-    extraKeys: {
-        "Enter": (cm) => {
-            cm.replaceSelection("\n"); 
-            const prevLineText = cm.getLine(cm.getCursor().line - 1);
-            if (!prevLineText) return;
-            const match = prevLineText.match(/^\s*/);
-            if (match && match[0]) { cm.replaceSelection(match[0]); }
-        },
-        "'<'": isAndroid ? null : (cm) => { cm.replaceSelection("<>"); cm.setCursor(cm.getCursor().line, cm.getCursor().ch - 1); },
-        "'>'": isAndroid ? null : (cm) => handleGreaterThan(cm),
-        "'/'": isAndroid ? null : (cm) => handleSlash(cm)
-    }
-  });
-  if (history) { try { e.setHistory(history); } catch(err) { e.clearHistory(); } } else { e.clearHistory(); }
-  
-  // ✨ FIX: 監聽編輯器游標活動 (V21.2: 移除舊的自動選色邏輯，改為純點擊)
-  e.on("cursorActivity", (cm) => {
-      // 1. 原有的隱藏選單邏輯
-      if (!cm.getSelection()) {
-          hideCtxMenu();
-      }
-  });
-
-  function handleGreaterThan(cm) {
-      const pos = cm.getCursor();
-      if (cm.getRange(pos, {line: pos.line, ch: pos.ch + 1}) === '>') {
-          cm.setCursor({line: pos.line, ch: pos.ch + 1}); setTimeout(() => checkAndCloseTag(cm), 0); return;
-      } return CodeMirror.Pass;
-  }
-  function handleSlash(cm) {
-      cm.replaceSelection("/"); setTimeout(() => {
-          const pos = cm.getCursor();
-          if (cm.getRange({line: pos.line, ch: pos.ch - 2}, {line: pos.line, ch: pos.ch - 1}) === "<") checkAndCloseTag(cm, true);
-      }, 0);
-  }
-  function checkAndCloseTag(cm, isSlashClose = false) {
-      const tok = cm.getTokenAt(cm.getCursor());
-      const inner = CodeMirror.innerMode(cm.getMode(), tok.state);
-      if (inner.mode.name !== "xml") return;
-      const tagName = inner.state.context && inner.state.context.tagName;
-      const voidTags = ["area","base","br","col","embed","hr","img","input","link","meta","param","source","track","wbr"];
-      if (tagName && !voidTags.includes(tagName)) {
-          if (isSlashClose) {
-              const pos = cm.getCursor();
-              if (cm.getRange(pos, {line: pos.line, ch: pos.ch + 1}) === ">") {
-                  cm.replaceSelection(tagName); cm.setCursor({line: pos.line, ch: pos.ch + tagName.length + 1});
-              } else cm.replaceSelection(tagName + ">");
-          } else {
-              cm.replaceSelection("</" + tagName + ">");
-              const c = cm.getCursor(); cm.setCursor(c.line, c.ch - (tagName.length + 3)); 
-          }
-      }
-  }
-
-  if (isAndroid) {
-      e.on("change", (cm, change) => {
-          try { 
-            if (change.origin !== "+input") return;
-            const text = change.text[0];
-            function androidPair(open, close) {
-               if (text === open) setTimeout(() => { const p = cm.getCursor(); cm.replaceRange(close, p); cm.setCursor(p); }, 0);
-               if (text === close) setTimeout(() => { const p = cm.getCursor(); if (cm.getRange(p, {line: p.line, ch: p.ch + 1}) === close) cm.replaceRange("", p, {line: p.line, ch: p.ch + 1}); }, 0);
-            }
-            androidPair("<", ">"); androidPair("(", ")"); androidPair("[", "]"); androidPair("{", "}");
-            if (text === '"' || text === "'") {
-               setTimeout(() => { 
-                  const p = cm.getCursor(); const nextChar = cm.getRange(p, {line: p.line, ch: p.ch + 1});
-                  if (nextChar === text) { cm.replaceRange("", p, {line: p.line, ch: p.ch + 1}); } 
-                  else { cm.replaceRange(text, p); cm.setCursor(p); }
-               }, 0);
-            }
-            if (text === ">") setTimeout(() => checkAndCloseTag(cm, false), 0);
-            if (text === "/") setTimeout(() => { const p = cm.getCursor(); if (cm.getRange({line: p.line, ch: p.ch - 2}, {line: p.line, ch: p.ch - 1}) === "<") checkAndCloseTag(cm, true); }, 0);
-          } catch(err) { console.warn("Android CM logic error", err); }
-      });
-  }
-  
-  // ✨ 整合顏色預覽觸發邏輯 (V19)
-  e.on("change", (cm, change) => {
-      if (change.origin === "+rename") return; 
-      saveTabsToStorage();
-      refreshSearch(); 
-      
-      // Debounce update for color decorators
-      if (cm._colorTimer) clearTimeout(cm._colorTimer);
-      cm._colorTimer = setTimeout(() => {
-          updateColorDecorators(cm);
-      }, 500); 
-  });
-  
-  // 初始化時執行一次顏色偵測
-  setTimeout(() => updateColorDecorators(e), 100);
-
-  return e;
-}
-
-// Tab Logic
-function addTab(name, content='', history=null, shouldSave = true){
-  if (name == null) { let i = 1; while (tabs.some(t => t.name === `Untitled ${i}`)) i++; name = `Untitled ${i}`; }
-  const bar=document.getElementById("tabBar");
-  const div=document.createElement("div"); div.className="tab"; div.draggable = true; 
-  const span=document.createElement("span"); span.textContent=name; div.appendChild(span);
-  
-  const close=document.createElement("span"); 
-  close.className="close-btn"; 
-  close.innerHTML='<i class="ri-close-line"></i>'; 
-  div.appendChild(close);
-  
-  const tab={name, element: div, editor:null, content, history};
-  tabs.push(tab);
-
-  function startRenaming() {
-    if(div.querySelector('input')) return;
-    const input = document.createElement("input"); input.type = "text"; input.value = span.textContent;
-    input.onclick = (e) => e.stopPropagation(); input.onblur = finishEdit;
-    input.onkeydown = (ev) => { if(ev.key==="Enter") finishEdit(); };
-    div.replaceChild(input, span); input.focus(); input.select();
-    function finishEdit(){ if(!input.parentNode) return; span.textContent = input.value || "未命名"; div.replaceChild(span, input); tab.name = span.textContent; saveTabsToStorage(); }
-  }
-  close.onclick=(e)=>{ e.stopPropagation(); closeTab(tabs.indexOf(tab)); };
-  div.onclick = () => { if (!isDraggingMobile) { if (currentTab === tabs.indexOf(tab)) startRenaming(); else switchTab(tabs.indexOf(tab)); } };
-  bar.insertBefore(div, document.getElementById("newTabBtn"));
-  if (shouldSave) { switchTab(tabs.length-1); saveTabsToStorage(); }
-}
-
-function switchTab(i){
-  if(currentTab>=0 && tabs[currentTab] && tabs[currentTab].editor){
-    tabs[currentTab].content = tabs[currentTab].editor.getValue();
-    tabs[currentTab].history = tabs[currentTab].editor.getHistory();
-    editorWrapper.innerHTML="";
-  }
-  currentTab=i; const t=tabs[i]; if(!t) return;
-  if(!t.editor) t.editor=createEditor(t.content, t.history);
-  editorWrapper.appendChild(t.editor.getWrapperElement());
-  t.editor.refresh(); t.editor.focus();
-  
-  // ✨ 切換分頁時，重新渲染顏色方塊 (V19)
-  updateColorDecorators(t.editor);
-
-  tabs.forEach((t,i)=>t.element.classList.toggle("active",i===currentTab));
-  refreshSearch();
-}
-
-function closeTab(i){
-  if(tabs[i].editor) tabs[i].content = tabs[i].editor.getValue();
-  tabs[i].element.remove(); tabs.splice(i,1);
-  if (tabs.length === 0) { currentTab = -1; editorWrapper.innerHTML = ""; addTab(); return; }
-  if(currentTab===i) { currentTab=-1; editorWrapper.innerHTML=""; } else if(currentTab>i) { currentTab--; }
-  tabs.forEach((t,i)=>t.element.classList.toggle("active",i===currentTab));
-  if (currentTab === -1) switchTab(Math.max(0, i - 1));
-  saveTabsToStorage();
-}
-
-// Utils
-function toggleFullScreen() {
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen().then(() => { document.body.classList.add('fullscreen-mode'); }).catch(err => { console.log(err.message); });
-  } else {
-    document.exitFullscreen(); document.body.classList.remove('fullscreen-mode');
-  }
-}
-function formatCode() {
-  if (currentTab < 0) return;
-  const editor = tabs[currentTab].editor;
-  const totalLines = editor.lineCount();
-  editor.operation(() => { for (let i = 0; i < totalLines; ++i) { editor.indentLine(i, "smart"); } });
-  refreshSearch();
-}
-function changeFontSize(delta) {
-    currentFontSize += delta;
-    if (currentFontSize < 10) currentFontSize = 10;
-    if (currentFontSize > 30) currentFontSize = 30;
-    document.documentElement.style.setProperty('--base-font-size', currentFontSize + 'px');
-}
-function insertTemplate() {
-    if (currentTab < 0) return;
-    const editor = tabs[currentTab].editor;
-    const template = `<!DOCTYPE html>
-<html lang="zh">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Document</title>
-<style>
-    body { background: #222; color: #fff; padding: 20px; font-family: sans-serif; }
-</style>
-</head>
-<body>
-    <h1>Hello</h1>
-    <script>
-        console.log("Hello from Console!");
-    <\/script>
-</body>
-</html>`;
-    if (editor.getValue().trim() === "" || confirm("要覆蓋當前內容嗎？")) { editor.setValue(template); refreshSearch(); }
-}
-function downloadHTML(){
-  if(currentTab<0) return;
-  const link=document.createElement('a');
-  link.href=URL.createObjectURL(new Blob([tabs[currentTab].editor.getValue()],{type:'text/html'}));
-  link.download = (tabs[currentTab].name || "download") + ".html";
-  link.click();
-}
-function copyHTML(){ if(currentTab>=0) navigator.clipboard.writeText(tabs[currentTab].editor.getValue()).then(()=>alert("已複製程式碼")); }
-function pasteHTML(){ if(currentTab>=0) navigator.clipboard.readText().then(text=>{ tabs[currentTab].editor.setValue(text); saveTabsToStorage(); refreshSearch(); }); }
-function clearHTML(){ if(currentTab>=0 && confirm("確定要清空嗎?")) { tabs[currentTab].editor.setValue(""); saveTabsToStorage(); refreshSearch(); } }
-function editorUndo() { if(currentTab>=0) { tabs[currentTab].editor.undo(); tabs[currentTab].editor.focus(); } }
-function editorRedo() { if(currentTab>=0) { tabs[currentTab].editor.redo(); tabs[currentTab].editor.focus(); } }
-function openFile(){ document.getElementById("fileInput").click(); }
-
-document.getElementById("fileInput").onchange = (e) => {
-    const f = e.target.files[0]; if(!f) return;
-    const r = new FileReader(); 
-    r.onload = () => {
-        let name = f.name; const idx = name.lastIndexOf('.'); if(idx > 0) name = name.substring(0, idx);
-        addTab(name, r.result);
-    }; 
-    r.readAsText(f); e.target.value="";
-};
-document.getElementById("newTabBtn").onclick=()=>addTab();
-
-// Search
-let totalMatches = 0;
-let currentMatchIdx = 0;
-searchInput.addEventListener("input", refreshSearch);
-searchInput.addEventListener("keydown", function(e) { if (e.key === "Enter") { e.preventDefault(); if (e.shiftKey) findPrev(); else findNext(); } });
-function refreshSearch(){
-  if(currentTab<0) return;
-  const editor=tabs[currentTab].editor;
-  const query=searchInput.value;
-  editor.operation(()=>{ editor.getAllMarks().forEach(m=>m.clear()); });
-  if(!query) { searchCursor=null; searchCount.textContent = ""; totalMatches = 0; currentMatchIdx = 0; return; }
-  editor.operation(()=>{
-    totalMatches = 0;
-    const cursor = editor.getSearchCursor(query);
-    while(cursor.findNext()){ totalMatches++; editor.markText(cursor.from(), cursor.to(), {className: "cm-searching"}); }
-    searchCursor = editor.getSearchCursor(query);
-    updateSearchUI(0);
-  });
-}
-function updateSearchUI(idx) {
-  currentMatchIdx = idx;
-  if (totalMatches > 0) { searchCount.textContent = `${currentMatchIdx}/${totalMatches}`; } 
-  else { searchCount.textContent = searchInput.value ? "0/0" : ""; }
-}
-function highlightCurrent(from, to) {
-  if(currentTab<0) return;
-  const editor=tabs[currentTab].editor;
-  editor.getAllMarks().forEach(m => { if(m.className === "cm-active-search") m.clear(); });
-  editor.markText(from, to, {className: "cm-active-search"});
-}
-function findNext(){
-  if(currentTab<0) return;
-  const editor=tabs[currentTab].editor;
-  const query=searchInput.value;
-  if(!query) return;
-  if(!searchCursor) searchCursor = editor.getSearchCursor(query);
-  let found = searchCursor.findNext();
-  if(!found) { searchCursor = editor.getSearchCursor(query, {line: editor.lineCount(), ch: 0}); found = searchCursor.findNext(); }
-  if(found){
-    editor.setSelection(searchCursor.from(), searchCursor.to());
-    editor.scrollIntoView({from:searchCursor.from(), to:searchCursor.to()}, 20);
-    highlightCurrent(searchCursor.from(), searchCursor.to());
-    calculateCurrentIndex(editor, query, searchCursor.from());
-  }
-}
-function findPrev(){
-  if(currentTab<0) return;
-  const editor=tabs[currentTab].editor;
-  const query=searchInput.value;
-  if(!query) return;
-  if(!searchCursor) searchCursor = editor.getSearchCursor(query);
-  let found = searchCursor.findPrevious();
-  if(!found) { searchCursor = editor.getSearchCursor(query, {line: editor.lineCount(), ch: 0}); found = searchCursor.findPrevious(); }
-  if(found){
-    editor.setSelection(searchCursor.from(), searchCursor.to());
-    editor.scrollIntoView({from:searchCursor.from(), to:searchCursor.to()}, 20);
-    highlightCurrent(searchCursor.from(), searchCursor.to());
-    calculateCurrentIndex(editor, query, searchCursor.from());
-  }
-}
-function calculateCurrentIndex(editor, query, pos) {
-  let idx = 0;
-  let tempCursor = editor.getSearchCursor(query);
-  while(tempCursor.findNext()) { idx++; if (tempCursor.from().line === pos.line && tempCursor.from().ch === pos.ch) { updateSearchUI(idx); return; } }
-}
-
-// Drag & Drop
-tabBar.addEventListener("dragstart", (e) => { 
-    if (e.target.classList.contains("tab")) { draggedTab = e.target; setTimeout(() => draggedTab.classList.add("dragging"), 0); } 
-});
-tabBar.addEventListener("dragend", () => { 
-    if (draggedTab) { 
-        draggedTab.classList.remove("dragging"); draggedTab = null; 
-        updateTabsArrayOrder(); 
-        const activeTabElement = document.querySelector(".tab.active");
-        if (activeTabElement) { currentTab = tabs.findIndex(t => t.element === activeTabElement); }
-        saveTabsToStorage(); 
-    } 
-});
-tabBar.addEventListener("dragover", (e) => { 
-    e.preventDefault(); const dragging = document.querySelector(".dragging"); if (!dragging) return; 
-    const afterElement = getDragAfterElement(tabBar, e.clientX); 
-    const currentNext = dragging.nextElementSibling;
-    if (afterElement !== currentNext) {
-        if (afterElement == null) { tabBar.insertBefore(dragging, document.getElementById("newTabBtn")); } 
-        else { tabBar.insertBefore(dragging, afterElement); }
-    }
-});
-function getDragAfterElement(container, x) { 
-    const draggableElements = [...container.querySelectorAll(".tab:not(.dragging)")]; 
-    return draggableElements.reduce((closest, child) => { 
-        const box = child.getBoundingClientRect(); const offset = x - box.left - box.width / 2; 
-        if (offset < 0 && offset > closest.offset) return { offset: offset, element: child }; 
-        else return closest; 
-    }, { offset: Number.NEGATIVE_INFINITY }).element; 
-}
-function updateTabsArrayOrder() { 
-    const tabElements = [...document.querySelectorAll("#tabBar .tab")]; 
-    const newTabsArray = []; 
-    tabElements.forEach(tabElement => { 
-        const tabObject = tabs.find(t => t.element === tabElement); 
-        if (tabObject) newTabsArray.push(tabObject); 
-    }); 
-    tabs = newTabsArray; 
-}
-
-// Touch DnD
-tabBar.addEventListener("touchstart", (e) => { 
-    const targetTab = e.target.closest(".tab"); 
-    if (!targetTab || e.target.closest(".close-btn") || e.target.tagName === 'INPUT') return; 
-    startX = e.touches[0].clientX; startY = e.touches[0].clientY; 
-    if (isDraggingMobile) return; 
-    touchTimer = setTimeout(() => { 
-        isDraggingMobile = true; draggedTab = targetTab; 
-        draggedTab.removeAttribute('draggable');
-        document.body.classList.add('is-dragging-mode');
-        ghostTab = draggedTab.cloneNode(true);
-        ghostTab.classList.add('tab-ghost'); ghostTab.classList.remove('active'); 
-        ghostTab.style.width = draggedTab.offsetWidth + 'px';
-        document.body.appendChild(ghostTab);
-        updateGhostPosition(e.touches[0]);
-        draggedTab.classList.add("dragging"); 
-        if (navigator.vibrate) navigator.vibrate(50);
-    }, 300); 
-}, { passive: true });
-
-function updateGhostPosition(touch) {
-    if (ghostTab) { 
-        const barRect = tabBar.getBoundingClientRect();
-        const fixedY = barRect.top + (barRect.height / 2);
-        ghostTab.style.left = touch.clientX + 'px'; ghostTab.style.top = fixedY + 'px'; 
-    }
-}
-
-tabBar.addEventListener("touchmove", (e) => { 
-    const currentX = e.touches[0].clientX; 
-    if (!isDraggingMobile) { 
-        const dx = Math.abs(currentX - startX); const dy = Math.abs(e.touches[0].clientY - startY); 
-        if (touchTimer && (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD)) { clearTimeout(touchTimer); touchTimer = null; }
-        return; 
-    } 
-    if (e.cancelable) e.preventDefault(); if (!draggedTab) return; 
-    updateGhostPosition(e.touches[0]); handleAutoScroll(currentX);
-    const afterElement = getDragAfterElement(tabBar, currentX); 
-    const currentNext = draggedTab.nextElementSibling;
-    if (afterElement !== currentNext) {
-         if (afterElement == null) { tabBar.insertBefore(draggedTab, document.getElementById("newTabBtn")); } 
-         else { tabBar.insertBefore(draggedTab, afterElement); }
-    }
-}, { passive: false });
-
-function finishTouchDrag(e) {
-    if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; } 
-    document.body.classList.remove('is-dragging-mode');
-    if (ghostTab) { ghostTab.remove(); ghostTab = null; }
-    if (draggedTab) {
-        draggedTab.setAttribute('draggable', 'true');
-        if (isDraggingMobile) {
-            draggedTab.classList.remove("dragging"); updateTabsArrayOrder(); 
-            const activeTabElement = document.querySelector(".tab.active");
-            if (activeTabElement) { currentTab = tabs.findIndex(t => t.element === activeTabElement); }
-            saveTabsToStorage(); 
-        } else { draggedTab.classList.remove("dragging"); }
-    }
-    isDraggingMobile = false; draggedTab = null; 
-}
-tabBar.addEventListener("touchend", finishTouchDrag);
-tabBar.addEventListener("touchcancel", finishTouchDrag);
-function handleAutoScroll(x) {
-    const rect = tabBar.getBoundingClientRect(); const threshold = 40; 
-    if (x < rect.left + threshold) { tabBar.scrollLeft -= 5; } else if (x > rect.right - threshold) { tabBar.scrollLeft += 5; }
-}
-
-// --- Stealth Mode (隱形黑屏模式 - 鍵盤修復版) ---
-(function(){
-    const toggle = document.getElementById("stealthModeToggle");
-    const overlay = document.getElementById("stealthOverlay");
-    const unlockZone = document.getElementById("stealthUnlockZone");
-    const stealthInput = document.getElementById("stealthInput"); // 取得隱藏輸入框
-    let isInternalOperation = false;
-    const SECRET_CODE = "unlock"; // ✨ 設定你的解鎖密碼
-
-    // 攔截原生彈窗
-    const originalConfirm = window.confirm;
-    window.confirm = function(msg) { isInternalOperation = true; const result = originalConfirm(msg); setTimeout(() => { isInternalOperation = false; }, 200); return result; };
-    const originalAlert = window.alert;
-    window.alert = function(msg) { isInternalOperation = true; originalAlert(msg); setTimeout(() => { isInternalOperation = false; }, 200); };
-    const originalPrompt = window.prompt;
-    window.prompt = function(msg, defaultText) { isInternalOperation = true; const result = originalPrompt(msg, defaultText); setTimeout(() => { isInternalOperation = false; }, 200); return result; };
-    
-    const fileInput = document.getElementById("fileInput");
-    if(fileInput) { fileInput.addEventListener('click', () => { isInternalOperation = true; }); window.addEventListener('focus', () => { if(isInternalOperation) setTimeout(() => isInternalOperation = false, 500); }); }
-    
-    function activateStealth() { 
-        if (toggle.checked && overlay.style.display !== "block" && !isInternalOperation) { 
-            overlay.style.display = "block"; 
-            // ✨ 啟動時清空並對焦隱藏輸入框，喚起手機鍵盤
-            stealthInput.value = "";
-            stealthInput.focus();
-        } 
-    }
-    
-    function deactivateStealth() {
-        overlay.style.display = "none";
-        stealthInput.blur(); // 關閉鍵盤
-        // 嘗試將焦點還給編輯器 (選用)
-        if(currentTab >= 0 && tabs[currentTab].editor) tabs[currentTab].editor.focus();
-    }
-
-    // 監聽隱藏輸入框的輸入
-    stealthInput.addEventListener("input", (e) => {
-        if (stealthInput.value.toLowerCase().includes(SECRET_CODE)) {
-            deactivateStealth();
-            stealthInput.value = ""; // 清空
-        }
-    });
-
-    // 點擊黑屏任意處：重新喚起鍵盤 (解決鍵盤被收起的問題)
-    overlay.addEventListener("click", (e) => {
-        stealthInput.focus();
-    });
-
-    window.addEventListener("blur", () => { if (isInternalOperation) return; if (document.activeElement && document.activeElement.tagName === "IFRAME") return; activateStealth(); });
-    document.addEventListener("visibilitychange", () => { if (document.hidden) activateStealth(); });
-    
-    // --- 解鎖邏輯 ---
-    // 1. 電腦版雙擊
-    unlockZone.addEventListener("dblclick", (e) => { 
-        e.preventDefault(); e.stopPropagation(); deactivateStealth();
-    });
-
-    // 2. 手機版雙擊 (亦保留)
-    let lastTap = 0;
-    unlockZone.addEventListener('touchend', function(e) {
-        e.preventDefault(); 
-        const currentTime = new Date().getTime();
-        const tapLength = currentTime - lastTap;
-        if (tapLength < 400 && tapLength > 0) {
-            deactivateStealth();
-            e.stopPropagation();
-        }
-        lastTap = currentTime;
-    });
-
-    // 攔截按鍵：只允許隱藏輸入框接收輸入，其他阻擋
-    window.addEventListener("keydown", (e) => { 
-        if (overlay.style.display === "block") { 
-            // ✨ 如果焦點在我們的隱藏輸入框，允許輸入
-            if (e.target === stealthInput) return;
-            
-            // 否則阻擋 (防止操作到底層編輯器)
-            e.preventDefault(); 
-            e.stopPropagation(); 
-            stealthInput.focus(); // 強制把焦點拉回來
-        } 
-    }, true);
-
-    overlay.addEventListener("contextmenu", (e) => { e.preventDefault(); return false; });
-})();
-
-// --- Google Drive Integration ---
-// TODO: 請在此填入你的 Google Cloud Console 憑證
-const GD_CLIENT_ID = '141704125172-2ntkus080b4cm4pi10s9koalp7utdere.apps.googleusercontent.com';
-const GD_API_KEY = 'AIzaSyCUo6FSo2LDrsc7sypAuW7JwwGrUKLceuY';
-const GD_DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
-const GD_SCOPES = 'https://www.googleapis.com/auth/drive.file';
-
-let tokenClient;
-let gapiInited = false;
-let gisInited = false;
-
-// 初始化 gapi
-function gapiLoaded() {
-    gapi.load('client', async () => {
-        await gapi.client.init({
-            apiKey: GD_API_KEY,
-            discoveryDocs: [GD_DISCOVERY_DOC],
+            container.appendChild(div);
         });
-        gapiInited = true;
-    });
-}
-
-// 初始化 GIS (Google Identity Services)
-function gisLoaded() {
-    tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: GD_CLIENT_ID,
-        scope: GD_SCOPES,
-        callback: '', // 定義在觸發時
-    });
-    gisInited = true;
-}
-
-// 載入 Google Scripts
-(function loadGoogleLibs() {
-    const s1 = document.createElement('script');
-    s1.src = 'https://apis.google.com/js/api.js';
-    s1.onload = gapiLoaded;
-    document.body.appendChild(s1);
-
-    const s2 = document.createElement('script');
-    s2.src = 'https://accounts.google.com/gsi/client';
-    s2.onload = gisLoaded;
-    document.body.appendChild(s2);
-})();
-
-async function saveToGoogleDrive() {
-    if (currentTab < 0) return alert("請先開啟或建立一個檔案");
-    if (!GD_CLIENT_ID || GD_CLIENT_ID.includes("YOUR_CLIENT_ID")) {
-        return alert("錯誤：請先在程式碼中設定 Google Client ID 與 API Key。");
+        document.getElementById('file-name').textContent = files[activeIndex].name;
     }
 
-    // 取得當前內容
-    const content = tabs[currentTab].editor.getValue();
-    const fileName = (tabs[currentTab].name || "untitled") + ".html";
-
-    // 處理登入與權限請求
-    tokenClient.callback = async (resp) => {
-        if (resp.error) throw resp;
-        await uploadFileToDrive(fileName, content);
-    };
-
-    if (gapi.client.getToken() === null) {
-        // 如果沒有 Token，觸發登入
-        tokenClient.requestAccessToken({prompt: 'consent'});
-    } else {
-        // 已有 Token，直接上傳
-        tokenClient.requestAccessToken({prompt: ''});
+    function switchTab(idx) {
+        files[activeIndex].content = editor.value; // 存舊
+        activeIndex = idx;
+        editor.value = files[activeIndex].content; // 讀新
+        renderTabs();
+        updateHighlight();
     }
-}
 
-async function uploadFileToDrive(name, content) {
-    saveStatus.classList.add("saving"); // 顯示儲存中燈號
-    try {
-        const file = new Blob([content], {type: 'text/html'});
-        const metadata = {
-            'name': name,
-            'mimeType': 'text/html'
-        };
+    function addNewTab() {
+        files.push({ name: 'new.html', content: '' });
+        switchTab(files.length - 1);
+    }
 
-        const accessToken = gapi.client.getToken().access_token;
-        const form = new FormData();
-        form.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
-        form.append('file', file);
+    // === 右鍵選單邏輯 ===
+    function showContextMenu(x, y) {
+        contextMenu.style.display = 'block';
+        contextMenu.style.left = x + 'px';
+        contextMenu.style.top = y + 'px';
+    }
 
-        const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-            method: 'POST',
-            headers: new Headers({ 'Authorization': 'Bearer ' + accessToken }),
-            body: form
-        });
-        
-        const data = await response.json();
-        
-        if (data.id) {
-            alert(`成功儲存到 Google Drive！\n檔案 ID: ${data.id}`);
-        } else {
-            alert("上傳失敗，請查看 Console。");
-            console.error(data);
+    // 點擊別處關閉選單
+    document.addEventListener('click', () => { contextMenu.style.display = 'none'; });
+
+    // 重命名功能 (使用 Prompt 最穩)
+    function renameCurrentTab() {
+        if (contextMenuTargetIndex === -1) return;
+        const currentName = files[contextMenuTargetIndex].name;
+        const newName = prompt("請輸入新檔案名稱：", currentName);
+        if (newName && newName.trim() !== "") {
+            files[contextMenuTargetIndex].name = newName.trim();
+            renderTabs();
         }
-    } catch (err) {
-        alert("發生錯誤：" + err.message);
-        console.error(err);
-    } finally {
-        saveStatus.classList.remove("saving");
-        saveStatus.classList.add("saved");
-        setTimeout(() => saveStatus.classList.remove("saved"), 1000);
     }
-}
 
-loadTabsFromStorage();
-</script>
-
-<script>
-// --- 選取行數功能 & 右鍵選單 ---
-const selectOverlay = document.getElementById('selectOverlay');
-const lineStartInput = document.getElementById('lineStart');
-const lineEndInput = document.getElementById('lineEnd');
-const ctxMenu = document.getElementById('mobileContextMenu');
-
-function openSelectModal() {
-    if (currentTab < 0) return alert("請先建立或開啟一個檔案");
-    hideCtxMenu();
-    selectOverlay.style.display = "flex";
-    
-    const cursorLine = tabs[currentTab].editor.getCursor().line + 1;
-    lineStartInput.value = cursorLine;
-    lineEndInput.value = cursorLine;
-    
-    setTimeout(() => {
-        lineStartInput.focus();
-        lineStartInput.select();
-    }, 100);
-}
-
-function closeSelectModal() { selectOverlay.style.display = "none"; }
-
-function applyLineSelection() {
-    if (currentTab < 0) return;
-    let start = parseInt(lineStartInput.value);
-    let end = parseInt(lineEndInput.value);
-    if (isNaN(start) || isNaN(end)) return alert("請輸入數字");
-    if (start > end) [start, end] = [end, start]; 
-    
-    const editor = tabs[currentTab].editor;
-    const totalLines = editor.lineCount();
-    let fromLine = Math.max(0, start - 1);
-    let toLine = Math.min(totalLines - 1, end - 1);
-    const lastLineContent = editor.getLine(toLine);
-    const lastCharIndex = lastLineContent ? lastLineContent.length : 0;
-
-    editor.setSelection({ line: fromLine, ch: 0 }, { line: toLine, ch: lastCharIndex });
-    editor.scrollIntoView({ line: fromLine, ch: 0 }, 20);
-    editor.focus();
-    closeSelectModal();
-    setTimeout(() => { showContextMenuAtCursor(editor); }, 100);
-}
-
-function showContextMenuAtCursor(editor) {
-    const cursorCoords = editor.cursorCoords(true, "window");
-    let top = cursorCoords.top - 50; 
-    let left = cursorCoords.left;
-    if (top < 10) { top = cursorCoords.bottom + 10; }
-    const menuWidth = 180; 
-    if (left + menuWidth > window.innerWidth) { left = window.innerWidth - menuWidth - 10; }
-
-    ctxMenu.style.top = top + "px";
-    ctxMenu.style.left = left + "px";
-    ctxMenu.style.display = "flex";
-}
-
-function hideCtxMenu() { ctxMenu.style.display = "none"; }
-
-async function execCmd(cmd) {
-    const editor = tabs[currentTab].editor;
-    const text = editor.getSelection();
-    if (cmd === 'copy') {
-        try { await navigator.clipboard.writeText(text); alert("已複製！"); } 
-        catch (err) { document.execCommand('copy'); alert("已複製 (Legacy)"); }
-    } else if (cmd === 'cut') {
-        try { await navigator.clipboard.writeText(text); editor.replaceSelection(""); alert("已剪下！"); } 
-        catch (err) { document.execCommand('cut'); }
-    } else if (cmd === 'delete') {
-        editor.replaceSelection(""); 
+    function closeCurrentTab() {
+        if (contextMenuTargetIndex === -1) return;
+        if (files.length <= 1) { alert("無法關閉最後一個分頁"); return; }
+        if (confirm(`確定刪除 ${files[contextMenuTargetIndex].name}?`)) {
+            files.splice(contextMenuTargetIndex, 1);
+            if (activeIndex >= files.length) activeIndex = files.length - 1;
+            switchTab(activeIndex);
+        }
     }
-    hideCtxMenu();
-}
 
-document.addEventListener('mousedown', (e) => {
-    if (ctxMenu.contains(e.target)) return;
-    if (editorWrapper.contains(e.target)) return;
-    hideCtxMenu();
-});
+    // === 編輯器功能 ===
+    function updateHighlight() {
+        let code = editor.value;
+        code = code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        // 簡單 Regex
+        code = code.replace(/(&lt;!--[\s\S]*?--&gt;)/g, '<span class="hl-comment">$1</span>');
+        code = code.replace(/("[^"]*")/g, '<span class="hl-string">$1</span>');
+        code = code.replace(/(&lt;\/?)(\w+)(.*?)(\/?&gt;)/g, (m,p1,p2,p3,p4) => {
+            let attrs = p3.replace(/(\s+)([a-zA-Z0-9-]+)(=)/g, '$1<span class="hl-attr">$2</span>$3');
+            return `<span class="hl-bracket">${p1}</span><span class="hl-tag">${p2}</span>${attrs}<span class="hl-bracket">${p4}</span>`;
+        });
+        highlighting.innerHTML = code + '\n';
+    }
 
-lineEndInput.addEventListener("keydown", function(e) { if (e.key === "Enter") applyLineSelection(); });
-lineStartInput.addEventListener("keydown", function(e) { if (e.key === "Enter") lineEndInput.focus(); });
+    editor.addEventListener('input', updateHighlight);
+    editor.addEventListener('scroll', () => {
+        highlighting.scrollTop = editor.scrollTop;
+        highlighting.scrollLeft = editor.scrollLeft;
+    });
+    editor.addEventListener('keydown', e => {
+        if(e.key==='Tab'){ e.preventDefault(); document.execCommand('insertText', false, '    '); }
+    });
+
+    function executeCode() {
+        const w = window.open();
+        w.document.write(editor.value);
+    }
+    function copyCode() { navigator.clipboard.writeText(editor.value); showStatus('已複製'); }
+    function clearCode() { if(confirm('清空?')) { editor.value=''; updateHighlight(); } }
+
+    window.onload = () => { initGoogle(); renderTabs(); updateHighlight(); };
 </script>
 </body>
 </html>
