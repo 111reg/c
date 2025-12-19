@@ -385,16 +385,14 @@ are not covered by this copyright notice.
         <input type="checkbox" id="useConsole" checked> 
         Shell
     </label>
+    <label class="shell-option" title="儲存至 Google Drive (需設定 API)">
+        <input type="checkbox" id="useCloud"> 
+        Cloud
+    </label>
     <label class="shell-option" title="匿蹤">
         <input type="checkbox" id="stealthModeToggle"> 
         Hide
     </label>
-    
-    <label class="shell-option" title="存取至 Google Drive">
-        <input type="checkbox" id="useCloud"> 
-        Cloud
-    </label>
-    
     <div id="saveStatus" class="save-status" title="存檔狀態"></div>
     <input type="file" id="fileInput" style="display:none" accept=".html,.css,.js,.txt,.json,.md,.htm">
 
@@ -500,8 +498,6 @@ are not covered by this copyright notice.
 <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.15/mode/javascript/javascript.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.15/mode/css/css.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.15/mode/xml/xml.js"></script>
-<script src="https://accounts.google.com/gsi/client" async defer></script>
-<script src="https://apis.google.com/js/api.js" async defer></script>
 
 <script>
 // ✨ 全局變數
@@ -1374,195 +1370,173 @@ function handleAutoScroll(x) {
     overlay.addEventListener("contextmenu", (e) => { e.preventDefault(); return false; });
 })();
 
-/* --- ✨ Google Drive API 整合模組 --- */
-const G_CLIENT_ID = '747489154792-97q5ftdt2ii6bpbiva3hbtdvk8puq1f4.apps.googleusercontent.com
-'; // 必填: Google Cloud Console -> OAuth 2.0 Client ID
-const G_API_KEY = 'AIzaSyCalEqkmPm46fpDkOWINqQTuVzgSne7PGs';       // 必填: Google Cloud Console -> API Key
-const G_SCOPES = 'https://www.googleapis.com/auth/drive.file';
+loadTabsFromStorage();
+</script>
 
-let gTokenClient;
-let gAccessToken = null;
-let gApiLoaded = false;
+<script>
+// --- Google Drive Integration (V26 Cloud) ---
+// ✨ 請在此填入你的 Google Client ID 和 API Key (需在 Google Cloud Console 啟用 Drive API)
+const GD_CLIENT_ID = '747489154792-97q5ftdt2ii6bpbiva3hbtdvk8puq1f4.apps.googleusercontent.com'; 
+const GD_API_KEY = 'AIzaSyCalEqkmPm46fpDkOWINqQTuVzgSne7PGs'; 
+const GD_DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
+const GD_SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
+let tokenClient;
+let gapiInited = false;
+let gisInited = false;
+let access_token = null;
 
 // 初始化 Google API
-function initGoogleClient() {
+function gapiLoaded() {
     gapi.load('client', async () => {
-        await gapi.client.init({
-            apiKey: G_API_KEY,
-            discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
-        });
-        gApiLoaded = true;
+        await gapi.client.init({ apiKey: GD_API_KEY, discoveryDocs: [GD_DISCOVERY_DOC] });
+        gapiInited = true;
     });
-    
-    gTokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: G_CLIENT_ID,
-        scope: G_SCOPES,
+}
+
+function gisLoaded() {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: GD_CLIENT_ID,
+        scope: GD_SCOPES,
         callback: (tokenResponse) => {
-            gAccessToken = tokenResponse.access_token;
-            if (gPendingAction) {
-                gPendingAction(); // 執行登入前原本想做的事
-                gPendingAction = null;
+            access_token = tokenResponse.access_token;
+            if (pendingCloudAction) {
+                const action = pendingCloudAction;
+                pendingCloudAction = null;
+                action();
             }
         },
     });
+    gisInited = true;
 }
 
-// 確保已登入，否則跳出登入視窗
-let gPendingAction = null;
-function ensureDriveAuth(callback) {
-    if (!gApiLoaded) { alert("Google API 尚未載入完成，請稍候..."); return; }
-    if (gAccessToken) {
+let pendingCloudAction = null;
+
+// 驗證登入並執行動作
+function executeWithDrive(callback) {
+    if (!gapiInited || !gisInited) return alert("Google API 尚未載入，請檢查網路或 API 設定");
+    
+    // 如果已有 token，直接執行
+    if (access_token) {
         callback();
     } else {
-        gPendingAction = callback;
-        gTokenClient.requestAccessToken();
+        // 否則跳轉登入
+        pendingCloudAction = callback;
+        tokenClient.requestAccessToken();
     }
 }
 
-// 上傳檔案到 Drive
-async function uploadToDrive(fileName, content, mimeType = 'text/html') {
-    ensureDriveAuth(async () => {
-        try {
-            const fileMetadata = { 'name': fileName, 'mimeType': mimeType };
-            const boundary = '-------314159265358979323846';
-            const delimiter = "\r\n--" + boundary + "\r\n";
-            const close_delim = "\r\n--" + boundary + "--";
-
-            const requestBody =
-                delimiter +
-                'Content-Type: application/json\r\n\r\n' +
-                JSON.stringify(fileMetadata) +
-                delimiter +
-                'Content-Type: ' + mimeType + '\r\n\r\n' +
-                content +
-                close_delim;
-
-            const request = gapi.client.request({
-                'path': '/upload/drive/v3/files',
-                'method': 'POST',
-                'params': { 'uploadType': 'multipart' },
-                'headers': {
-                    'Content-Type': 'multipart/related; boundary="' + boundary + '"'
-                },
-                'body': requestBody
-            });
-
-            await request;
-            alert(`✅ 已成功儲存 "${fileName}" 到 Google雲端硬碟！`);
-        } catch (err) {
-            console.error(err);
-            alert("❌ 上傳失敗：" + JSON.stringify(err));
-        }
-    });
-}
-
-// 從 Drive 開啟 (這裡使用 Google Picker API 會有最佳體驗，但為簡化改用 Prompt 輸入 ID 或列出最近檔案)
-// 為了完整體驗，這裡實作一個簡單的「列出最近 HTML 檔案」功能
-async function listAndPickDriveFile() {
-    ensureDriveAuth(async () => {
-        try {
-            const response = await gapi.client.drive.files.list({
-                'pageSize': 10,
-                'fields': "nextPageToken, files(id, name)",
-                'q': "mimeType = 'text/html' and trashed = false"
-            });
-            const files = response.result.files;
-            if (!files || files.length === 0) {
-                alert('沒有在 Drive 上找到 HTML 檔案。');
-                return;
-            }
-            
-            // 簡單製作一個選單 (實際專案建議用 Modal)
-            let msg = "請輸入要開啟的檔案編號 (1-" + files.length + "):\n";
-            files.forEach((f, index) => {
-                msg += `[${index + 1}] ${f.name}\n`;
-            });
-            
-            const choice = prompt(msg);
-            if (choice) {
-                const idx = parseInt(choice) - 1;
-                if (files[idx]) {
-                    downloadDriveFile(files[idx].id, files[idx].name);
-                }
-            }
-        } catch (err) {
-            alert("讀取列表失敗: " + err.message);
-        }
-    });
-}
-
-async function downloadDriveFile(fileId, fileName) {
+// ☁️ 上傳檔案到 Drive
+async function uploadToDrive(fileName, content, mimeType = "text/html") {
     try {
-        const response = await gapi.client.drive.files.get({
-            fileId: fileId,
-            alt: 'media'
+        const fileContent = new Blob([content], {type: mimeType});
+        const metadata = {
+            'name': fileName,
+            'mimeType': mimeType
+        };
+
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        form.append('file', fileContent);
+
+        const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+            method: 'POST',
+            headers: new Headers({ 'Authorization': 'Bearer ' + access_token }),
+            body: form
         });
-        addTab(fileName, response.body);
+        
+        const data = await response.json();
+        if(data.id) alert(`✅ 成功儲存至 Google Drive！\n檔案 ID: ${data.id}`);
+        else alert("儲存失敗：" + JSON.stringify(data));
+
     } catch (err) {
-        alert("下載檔案內容失敗");
+        alert("上傳錯誤: " + err.message);
     }
 }
 
-// 啟動 API 載入
-window.onload = function() {
-    // 保留原本的邏輯 (如果有)
-    if(typeof initDB === 'function') initDB(); 
-    initGoogleClient();
-};
+// ☁️ 從 Drive 開啟 (簡易列表模式)
+async function listAndOpenFromDrive() {
+    try {
+        // 列出最近的 10 個 HTML 檔案
+        const res = await gapi.client.drive.files.list({
+            'pageSize': 10,
+            'fields': "files(id, name)",
+            'q': "mimeType='text/html' and trashed=false",
+            'orderBy': 'modifiedTime desc'
+        });
+        
+        const files = res.result.files;
+        if (!files || files.length === 0) return alert("Drive 上找不到 HTML 檔案。");
 
-/* --- 🔄 修改原有的功能函數 --- */
+        let msg = "請輸入編號來開啟檔案：\n";
+        files.forEach((f, index) => {
+            msg += `[${index + 1}] ${f.name}\n`;
+        });
 
-// 1. 修改 downloadHTML
-const originalDownloadHTML = downloadHTML; // 備份舊函數 (如果需要)
+        const choice = prompt(msg);
+        if (!choice) return;
+        const idx = parseInt(choice) - 1;
+
+        if (files[idx]) {
+            const fileId = files[idx].id;
+            const fileName = files[idx].name;
+            
+            // 下載檔案內容
+            const fileRes = await gapi.client.drive.files.get({ fileId: fileId, alt: 'media' });
+            addTab(fileName.replace('.html', ''), fileRes.body);
+            alert(`已從雲端開啟: ${fileName}`);
+        }
+    } catch (err) {
+        alert("讀取列表失敗: " + err.message);
+    }
+}
+
+// --- ✨ 覆寫現有功能 (Modified Functions) ---
+
+// 1. 覆寫下載功能
+const originalDownload = downloadHTML;
 downloadHTML = function() {
-    if (currentTab < 0) return;
     const useCloud = document.getElementById('useCloud').checked;
-    
-    if (useCloud) {
-        // 雲端存檔邏輯
-        const content = tabs[currentTab].editor.getValue();
-        const name = (tabs[currentTab].name || "download") + ".html";
-        uploadToDrive(name, content);
+    if (useCloud && currentTab >= 0) {
+        executeWithDrive(() => {
+            const name = (tabs[currentTab].name || "download") + ".html";
+            const content = tabs[currentTab].editor.getValue();
+            uploadToDrive(name, content);
+        });
     } else {
-        // 原本的本地下載邏輯
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(new Blob([tabs[currentTab].editor.getValue()], {type:'text/html'}));
-        link.download = (tabs[currentTab].name || "download") + ".html";
-        link.click();
+        originalDownload(); // 執行原本的本地下載
     }
 };
 
-// 2. 修改 openFile
+// 2. 覆寫開啟檔案功能
 const originalOpenFile = openFile;
 openFile = function() {
     const useCloud = document.getElementById('useCloud').checked;
-    
     if (useCloud) {
-        // 雲端開啟邏輯
-        listAndPickDriveFile();
+        executeWithDrive(() => {
+            listAndOpenFromDrive();
+        });
     } else {
-        // 原本的本地開啟邏輯
-        document.getElementById("fileInput").click();
+        originalOpenFile(); // 執行原本的本地開啟
     }
 };
 
-// 3. 修改 processEncryption (加密並上傳)
-// 注意：原本的 processEncryption 是直接下載 Blob，我們需要攔截它
+// 3. 覆寫加密功能 (Process Encryption)
 const originalProcessEncryption = processEncryption;
 processEncryption = function() {
     const useCloud = document.getElementById('useCloud').checked;
     
+    // 如果沒勾選 Cloud，直接跑原本的邏輯
     if (!useCloud) {
-        // 如果沒勾選 Cloud，直接執行原本的邏輯
         originalProcessEncryption();
         return;
     }
 
-    // --- Cloud 加密邏輯 (複製自原函數並修改結尾) ---
-    const account = document.getElementById('encAccount').value.trim();
-    const pass = document.getElementById('encPass').value;
-    const title = document.getElementById('encTitle').value || "Secured Document";
-    
+    // Cloud 模式下的加密邏輯
+    const account = encAccount.value.trim();
+    const pass = encPass.value;
+    const title = encTitle.value || "Secured Document";
+
     if (!account) return alert("錯誤：請設定帳號 (Account)");
     if (!pass) return alert("錯誤：請設定加密密碼");
     
@@ -1572,21 +1546,19 @@ processEncryption = function() {
     try {
         const finalKey = account + pass;
         const encrypted = CryptoJS.AES.encrypt(content, finalKey).toString();
-        const finalHtml = getDecryptionTemplate(title, encrypted); // 呼叫原本既有的 helper
-        
-        // 這裡改為上傳到 Drive
-        uploadToDrive(title + " (Encrypted).html", finalHtml);
+        const finalHtml = getDecryptionTemplate(title, encrypted);
         
         closeEncryptModal();
+        
+        // 觸發雲端儲存
+        executeWithDrive(() => {
+            uploadToDrive("Encrypted_" + title + ".html", finalHtml);
+        });
+
     } catch (err) {
         alert("加密失敗：" + err.message);
     }
 };
-
-loadTabsFromStorage();
-</script>
-
-<script>
 // --- 選取行數功能 & 右鍵選單 ---
 const selectOverlay = document.getElementById('selectOverlay');
 const lineStartInput = document.getElementById('lineStart');
@@ -1670,5 +1642,7 @@ document.addEventListener('mousedown', (e) => {
 lineEndInput.addEventListener("keydown", function(e) { if (e.key === "Enter") applyLineSelection(); });
 lineStartInput.addEventListener("keydown", function(e) { if (e.key === "Enter") lineEndInput.focus(); });
 </script>
+<script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
+<script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
 </body>
 </html>
