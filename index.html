@@ -385,10 +385,10 @@ are not covered by this copyright notice.
         <input type="checkbox" id="useConsole" checked> 
         Shell
     </label>
-    <label class="shell-option" title="儲存至 Google Drive (需設定 API)">
-        <input type="checkbox" id="useCloud"> 
-        Cloud
-    </label>
+<label class="shell-option" title="儲存至 Google Drive">
+    <input type="checkbox" id="useCloud"> 
+    Cloud
+</label>
     <label class="shell-option" title="匿蹤">
         <input type="checkbox" id="stealthModeToggle"> 
         Hide
@@ -1374,14 +1374,14 @@ loadTabsFromStorage();
 </script>
 
 <script>
-// --- Google Drive Integration (V27 Picker Edition) ---
-// ✨ 請在此填入你的 Google Client ID, API Key 和 Project Number
+// --- Google Drive Integration (V28 Ultimate Picker) ---
+// ✨ 設定區：請填入您的 Google Cloud 資訊
 const GD_CLIENT_ID = '747489154792-97q5ftdt2ii6bpbiva3hbtdvk8puq1f4.apps.googleusercontent.com'; 
 const GD_API_KEY = 'AIzaSyCalEqkmPm46fpDkOWINqQTuVzgSne7PGs'; 
-const GD_APP_ID = '747489154792'; // (選填) 你的 Google Cloud Project Number (數字)
+const GD_APP_ID = '747489154792'; // 建議填入 Project Number 以確保 Picker 穩定
 
-// Scope 必須包含 drive.file 以便寫入
-const GD_SCOPES = 'https://www.googleapis.com/auth/drive.file';
+// ✨ 關鍵權限：包含 drive.file (讀寫) 與 metadata (瀏覽資料夾結構)
+const GD_SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.metadata.readonly';
 const GD_DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
 
 let tokenClient;
@@ -1389,7 +1389,7 @@ let access_token = null;
 let gapiInited = false;
 let gisInited = false;
 
-// 初始化 API & Picker
+// 初始化 API
 function gapiLoaded() {
     gapi.load('client:picker', async () => {
         await gapi.client.init({ apiKey: GD_API_KEY, discoveryDocs: [GD_DISCOVERY_DOC] });
@@ -1397,16 +1397,19 @@ function gapiLoaded() {
     });
 }
 
+// 初始化 Identity Services
 function gisLoaded() {
     tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: GD_CLIENT_ID,
         scope: GD_SCOPES,
         callback: (tokenResponse) => {
             access_token = tokenResponse.access_token;
-            if (pendingCloudAction) {
-                const action = pendingCloudAction;
-                pendingCloudAction = null;
-                action();
+            if (tokenResponse && tokenResponse.access_token) {
+                if (pendingCloudAction) {
+                    const action = pendingCloudAction;
+                    pendingCloudAction = null;
+                    action();
+                }
             }
         },
     });
@@ -1415,34 +1418,44 @@ function gisLoaded() {
 
 let pendingCloudAction = null;
 
-// 統一驗證入口
+// 統一驗證與執行入口
 function executeWithDrive(callback) {
-    if (!gapiInited || !gisInited) return alert("Google API 初始化中，請稍後...");
+    if (!gapiInited || !gisInited) {
+        alert("Google API 正在初始化，請稍候再試...");
+        return;
+    }
+    
+    // 檢查 Token 是否有效
     if (access_token) {
         callback();
     } else {
+        // 觸發登入
         pendingCloudAction = callback;
-        tokenClient.requestAccessToken();
+        tokenClient.requestAccessToken({prompt: 'consent'});
     }
 }
 
-// ☁️ 核心功能：建立 Google Picker 介面
+// ☁️ 建立 Google Picker (完美介面核心)
 function createPicker(mode, contentToSave = null, fileNameToSave = null) {
     if (!access_token) return;
 
-    const view = new google.picker.View(google.picker.ViewId.DOCS);
+    const viewId = (mode === 'OPEN') ? google.picker.ViewId.DOCS : google.picker.ViewId.FOLDERS;
+    
     const pickerBuilder = new google.picker.PickerBuilder()
         .setOAuthToken(access_token)
         .setDeveloperKey(GD_API_KEY)
-        .setAppId(GD_APP_ID);
+        .setAppId(GD_APP_ID)
+        .setOrigin(window.location.protocol + '//' + window.location.host);
 
     if (mode === 'OPEN') {
-        // --- 開啟模式：只顯示 HTML 檔案 ---
+        // --- [開啟模式] 選擇 HTML 檔案 ---
+        const view = new google.picker.View(google.picker.ViewId.DOCS);
         view.setMimeTypes("text/html");
+        
         pickerBuilder.addView(view)
             .setSelectableMimeTypes("text/html")
-            .setTitle("☁️ 請選擇要開啟的檔案 (Google Drive)");
-            
+            .setTitle("📂 開啟檔案 (Open from Drive)");
+
         pickerBuilder.setCallback((data) => {
             if (data.action === google.picker.Action.PICKED) {
                 const fileId = data.docs[0].id;
@@ -1451,55 +1464,58 @@ function createPicker(mode, contentToSave = null, fileNameToSave = null) {
             }
         });
 
-    } else if (mode === 'SAVE') {
-        // --- 儲存模式：選擇資料夾 ---
-        // 使用 FOLDERS View 讓使用者選擇儲存位置
+    } else {
+        // --- [儲存/加密模式] 選擇資料夾 ---
+        // 使用 DocsView 且指定 FOLDERS，這是選取資料夾最穩定的方式
         const folderView = new google.picker.DocsView(google.picker.ViewId.FOLDERS)
-            .setSelectableMimeTypes('application/vnd.google-apps.folder')
-            .setIncludeFolders(true)
-            .setMimeTypes('application/vnd.google-apps.folder');
+            .setIncludeFolders(true) 
+            .setMimeTypes('application/vnd.google-apps.folder')
+            .setSelectableMimeTypes('application/vnd.google-apps.folder');
 
         pickerBuilder.addView(folderView)
-            .setTitle(`☁️ 請選擇儲存位置 (${fileNameToSave})`)
+            .setTitle(`💾 儲存 "${fileNameToSave}" 到... (請選擇資料夾)`)
             .setSelectableMimeTypes('application/vnd.google-apps.folder');
 
         pickerBuilder.setCallback((data) => {
             if (data.action === google.picker.Action.PICKED) {
-                const folderId = data.docs[0].id; // 取得使用者選的資料夾 ID
-                uploadToDriveFolder(folderId, fileNameToSave, contentToSave);
+                const folderId = data.docs[0].id;
+                const folderName = data.docs[0].name;
+                // 確認儲存
+                if(confirm(`確定要儲存檔案到雲端資料夾：\n📂 ${folderName}\n📄 檔名: ${fileNameToSave}`)) {
+                    uploadToDriveFolder(folderId, fileNameToSave, contentToSave);
+                }
             }
         });
     }
 
-    pickerBuilder.build().setVisible(true);
+    const picker = pickerBuilder.build();
+    picker.setVisible(true);
 }
 
-// 📥 從 Drive 讀取檔案內容
+// 📥 讀取雲端檔案
 async function loadDriveFile(fileId, fileName) {
     try {
         const response = await gapi.client.drive.files.get({
             fileId: fileId,
             alt: 'media'
         });
-        const content = response.body;
-        // 移除副檔名作為 Tab 名稱
         const tabName = fileName.replace(/\.html$/i, '');
-        addTab(tabName, content);
-        alert(`✅ 已成功從雲端開啟：${fileName}`);
+        addTab(tabName, response.body);
     } catch (err) {
-        alert("讀取失敗：" + err.message);
+        alert("讀取失敗 (Read Error): " + err.message);
     }
 }
 
-// 📤 上傳檔案到指定資料夾
+// 📤 寫入雲端檔案 (指定資料夾)
 async function uploadToDriveFolder(folderId, fileName, content) {
+    const statusDiv = document.getElementById("saveStatus");
     try {
-        saveStatus.classList.add("saving"); // UI 狀態更新
+        if(statusDiv) statusDiv.classList.add("saving");
         
         const metadata = {
             name: fileName,
             mimeType: 'text/html',
-            parents: [folderId] // ✨ 關鍵：指定父資料夾 ID
+            parents: [folderId] // 指定父資料夾
         };
 
         const form = new FormData();
@@ -1514,64 +1530,68 @@ async function uploadToDriveFolder(folderId, fileName, content) {
         
         const data = await res.json();
         
-        saveStatus.classList.remove("saving");
-        saveStatus.classList.add("saved");
-        setTimeout(() => saveStatus.classList.remove("saved"), 2000);
+        if(statusDiv) {
+            statusDiv.classList.remove("saving");
+            statusDiv.classList.add("saved");
+            setTimeout(() => statusDiv.classList.remove("saved"), 2000);
+        }
 
         if (data.id) {
-            alert(`✅ 檔案已儲存至所選資料夾！\n檔名: ${fileName}`);
+            alert(`🎉 成功上傳！\nID: ${data.id}`);
         } else {
             throw new Error(JSON.stringify(data));
         }
 
     } catch (err) {
-        alert("上傳失敗：" + err.message);
-        saveStatus.classList.remove("saving");
+        if(statusDiv) statusDiv.classList.remove("saving");
+        alert("上傳失敗 (Upload Error): " + err.message);
+        console.error(err);
     }
 }
 
-// --- ✨ 功能覆寫區 (Function Overrides) ---
+// --- ✨ 功能覆寫與攔截 (Override Logic) ---
 
-// 1. 覆寫「開啟檔案」
-const originalOpenFile = openFile;
-openFile = function() {
-    if (document.getElementById('useCloud').checked) {
-        executeWithDrive(() => {
-            // 呼叫 Picker 進入開啟模式
-            createPicker('OPEN');
-        });
-    } else {
-        originalOpenFile();
-    }
-};
-
-// 2. 覆寫「下載原始碼」(儲存)
+// 1. 攔截「下載」按鈕 -> 轉為儲存到雲端
 const originalDownload = downloadHTML;
 downloadHTML = function() {
-    if (document.getElementById('useCloud').checked) {
-        if (currentTab < 0) return;
+    const cloudCheck = document.getElementById('useCloud');
+    // 如果有勾選 Cloud 且當前有分頁
+    if (cloudCheck && cloudCheck.checked && currentTab >= 0) {
         executeWithDrive(() => {
             const name = (tabs[currentTab].name || "download") + ".html";
             const content = tabs[currentTab].editor.getValue();
-            // 呼叫 Picker 進入儲存模式 (選擇資料夾)
+            // 喚起 Picker (儲存模式)
             createPicker('SAVE', content, name);
         });
     } else {
-        originalDownload();
+        originalDownload(); // 執行原本的下載
     }
 };
 
-// 3. 覆寫「加密封裝」
+// 2. 攔截「開啟」按鈕 -> 轉為從雲端選檔
+const originalOpenFile = openFile;
+openFile = function() {
+    const cloudCheck = document.getElementById('useCloud');
+    if (cloudCheck && cloudCheck.checked) {
+        executeWithDrive(() => {
+            // 喚起 Picker (開啟模式)
+            createPicker('OPEN');
+        });
+    } else {
+        originalOpenFile(); // 執行原本的開啟
+    }
+};
+
+// 3. 攔截「加密封裝」按鈕 -> 轉為儲存加密檔到雲端
 const originalProcessEncryption = processEncryption;
 processEncryption = function() {
-    // 檢查是否勾選雲端
-    const useCloud = document.getElementById('useCloud').checked;
-    if (!useCloud) {
+    const cloudCheck = document.getElementById('useCloud');
+    if (!cloudCheck || !cloudCheck.checked) {
         originalProcessEncryption();
         return;
     }
 
-    // 雲端加密流程
+    // Cloud 模式下的加密流程
     const account = encAccount.value.trim();
     const pass = encPass.value;
     const title = encTitle.value || "Secured Document";
@@ -1585,13 +1605,14 @@ processEncryption = function() {
     try {
         const finalKey = account + pass;
         const encrypted = CryptoJS.AES.encrypt(content, finalKey).toString();
+        // 產生加密後的 HTML 字串
         const finalHtml = getDecryptionTemplate(title, encrypted);
         
         closeEncryptModal();
         
-        const fileName = "Encrypted_" + title.replace(/\s+/g, '_') + ".html";
+        const fileName = "Encrypted_" + title.replace(/[\/\\:*?"<>|]/g, '_') + ".html";
         
-        // 觸發雲端儲存流程 (選擇資料夾)
+        // 喚起 Picker (儲存模式)
         executeWithDrive(() => {
             createPicker('SAVE', finalHtml, fileName);
         });
@@ -1600,6 +1621,8 @@ processEncryption = function() {
         alert("加密失敗：" + err.message);
     }
 };
+
+
 // --- 選取行數功能 & 右鍵選單 ---
 const selectOverlay = document.getElementById('selectOverlay');
 const lineStartInput = document.getElementById('lineStart');
