@@ -1375,6 +1375,74 @@ loadTabsFromStorage();
 
 <script>
 
+// --- ✨ 覆寫現有功能 (Modified Functions) ---
+
+// 1. 覆寫下載功能
+const originalDownload = downloadHTML;
+downloadHTML = function() {
+    const useCloud = document.getElementById('useCloud').checked;
+    if (useCloud && currentTab >= 0) {
+        executeWithDrive(() => {
+            const name = (tabs[currentTab].name || "download") + ".html";
+            const content = tabs[currentTab].editor.getValue();
+            uploadToDrive(name, content);
+        });
+    } else {
+        originalDownload(); // 執行原本的本地下載
+    }
+};
+
+// 2. 覆寫開啟檔案功能
+const originalOpenFile = openFile;
+openFile = function() {
+    const useCloud = document.getElementById('useCloud').checked;
+    if (useCloud) {
+        executeWithDrive(() => {
+            listAndOpenFromDrive();
+        });
+    } else {
+        originalOpenFile(); // 執行原本的本地開啟
+    }
+};
+
+// 3. 覆寫加密功能 (Process Encryption)
+const originalProcessEncryption = processEncryption;
+processEncryption = function() {
+    const useCloud = document.getElementById('useCloud').checked;
+    
+    // 如果沒勾選 Cloud，直接跑原本的邏輯
+    if (!useCloud) {
+        originalProcessEncryption();
+        return;
+    }
+
+    // Cloud 模式下的加密邏輯
+    const account = encAccount.value.trim();
+    const pass = encPass.value;
+    const title = encTitle.value || "Secured Document";
+
+    if (!account) return alert("錯誤：請設定帳號 (Account)");
+    if (!pass) return alert("錯誤：請設定加密密碼");
+    
+    const content = tabs[currentTab].editor.getValue();
+    if (!content.trim()) return alert("錯誤：檔案內容為空");
+
+    try {
+        const finalKey = account + pass;
+        const encrypted = CryptoJS.AES.encrypt(content, finalKey).toString();
+        const finalHtml = getDecryptionTemplate(title, encrypted);
+        
+        closeEncryptModal();
+        
+        // 觸發雲端儲存
+        executeWithDrive(() => {
+            uploadToDrive("Encrypted_" + title + ".html", finalHtml);
+        });
+
+    } catch (err) {
+        alert("加密失敗：" + err.message);
+    }
+};
 // --- 選取行數功能 & 右鍵選單 ---
 const selectOverlay = document.getElementById('selectOverlay');
 const lineStartInput = document.getElementById('lineStart');
@@ -1545,23 +1613,26 @@ async function uploadToDrive(fileName, content, mimeType = "text/html") {
 }
 
 // ☁️ 使用 Google Picker 開啟檔案 (取代原本的簡易列表)
+// ☁️ 使用 Google Picker 開啟檔案 (修正版：保留資料夾階層結構)
 function createPicker() {
     if (!access_token) return;
     
-    // 設定 View：顯示所有檔案與資料夾，並過濾 HTML
+    // 設定 View：使用 DocsView 標準模式
     const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
-        .setMimeTypes("text/html") // 只顯示 HTML
-        .setIncludeFolders(true)   // ✨ 關鍵：顯示資料夾
-        .setSelectFolderEnabled(false); // 只能選檔案，不能選資料夾
+        .setMimeTypes("text/html")     // 只顯示 HTML 檔案
+        .setIncludeFolders(true)       // 必須包含資料夾，使用者才能點進去
+        .setSelectFolderEnabled(false) // 設定為不能「選取」資料夾 (只能點進去瀏覽)
+        .setParent('root');            // ✨ 關鍵：指定從「我的雲端硬碟」根目錄開始，確保是層級式顯示
 
     const picker = new google.picker.PickerBuilder()
-        .enableFeature(google.picker.Feature.NAV_HIDDEN) // 隱藏左側導航 (讓介面更乾淨，選用)
+        // .enableFeature(google.picker.Feature.NAV_HIDDEN) // ❌ 關鍵修正：移除這行！開啟左側導航列，才能看到資料夾結構
         .setAppId(GD_PROJECT_NUM)
         .setOAuthToken(access_token)
-        .addView(view) // 加入主要視圖
-        .addView(new google.picker.DocsView()) // 備用視圖 (顯示所有類型)
+        .addView(view)                 // 加入設定好的視圖
         .setDeveloperKey(GD_API_KEY)
         .setCallback(pickerCallback)
+        .setTitle("請選擇 HTML 檔案")   // 視窗標題
+        .setSize(1051, 650)            // (選用) 加大視窗尺寸以利瀏覽
         .build();
         
     picker.setVisible(true);
