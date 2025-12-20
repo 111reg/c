@@ -346,6 +346,58 @@ are not covered by this copyright notice.
       border: 1px solid #ff5555 !important; /* 如果括號不對稱，顯示紅色 */
       background-color: rgba(255, 85, 85, 0.2);
   }
+  /* --- ☁️ 雲端美化專區 (New Cloud UI) --- */
+
+  /* 1. Cloud Toggle Switch (美化工具列開關) */
+  .cloud-toggle-wrapper {
+      display: flex; align-items: center; cursor: pointer;
+      background: #1e1e1e; border: 1px solid #444; border-radius: 20px;
+      padding: 4px 8px; margin: 0 4px; transition: 0.3s;
+  }
+  .cloud-toggle-wrapper:hover { background: #333; }
+  .cloud-toggle-wrapper input { display: none; } /* 隱藏原生 checkbox */
+  .cloud-icon { font-size: 16px; color: #666; transition: 0.3s; margin-right: 6px; }
+  .cloud-text { font-size: 12px; color: #aaa; transition: 0.3s; font-weight: 500; }
+  
+  /* 啟動狀態 */
+  .cloud-toggle-wrapper input:checked ~ .cloud-icon { color: #8be9fd; text-shadow: 0 0 8px rgba(139, 233, 253, 0.6); }
+  .cloud-toggle-wrapper input:checked ~ .cloud-text { color: #f8f8f2; }
+  .cloud-toggle-wrapper.active { border-color: #6272a4; background: rgba(98, 114, 164, 0.2); }
+
+  /* 2. Toast 通知系統 (取代 alert) */
+  #toast-container {
+      position: fixed; bottom: 20px; right: 20px; z-index: 10000;
+      display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+  }
+  .toast {
+      background: #282a36; border-left: 4px solid #6272a4; color: #f8f8f2;
+      padding: 12px 16px; border-radius: 4px; box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+      font-size: 13px; min-width: 250px; display: flex; align-items: center; gap: 10px;
+      opacity: 0; transform: translateX(50px); animation: toastIn 0.3s forwards;
+      pointer-events: auto; font-family: var(--ui-font);
+  }
+  .toast.success { border-left-color: #50fa7b; }
+  .toast.error { border-left-color: #ff5555; }
+  .toast.info { border-left-color: #8be9fd; }
+  .toast i { font-size: 18px; }
+  
+  @keyframes toastIn { to { opacity: 1; transform: translateX(0); } }
+  @keyframes toastOut { to { opacity: 0; transform: translateX(50px); } }
+
+  /* 3. 全局 Loading 遮罩 (上傳中...) */
+  #cloudLoader {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7); z-index: 99999;
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      backdrop-filter: blur(2px);
+  }
+  .spinner {
+      width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1);
+      border-top-color: #8be9fd; border-radius: 50%;
+      animation: spin 1s linear infinite; margin-bottom: 10px;
+  }
+  .loader-text { color: #fff; font-size: 14px; letter-spacing: 1px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -385,9 +437,10 @@ are not covered by this copyright notice.
         <input type="checkbox" id="useConsole" checked> 
         Shell
     </label>
-    <label class="shell-option" title="儲存至 Google Drive (需設定 API)">
-        <input type="checkbox" id="useCloud"> 
-        Cloud
+<label class="cloud-toggle-wrapper" title="啟用 Google Drive 雲端同步">
+        <input type="checkbox" id="useCloud" onchange="this.parentElement.classList.toggle('active', this.checked)">
+        <i class="ri-cloud-off-line cloud-icon" id="cloudIconDisplay"></i>
+        <span class="cloud-text">Cloud</span>
     </label>
     <label class="shell-option" title="匿蹤">
         <input type="checkbox" id="stealthModeToggle"> 
@@ -1530,15 +1583,54 @@ lineStartInput.addEventListener("keydown", function(e) { if (e.key === "Enter") 
 <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
 
 <script>
-// --- Google Drive Integration (V26 Cloud + Picker API - Folder Selection) ---
-// ✨ 請在此填入你的 Google Client ID 和 API Key
+// --- UI Helpers (雲端美化輔助函式) ---
+function showToast(msg, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    
+    // 根據類型選擇 Icon
+    let iconClass = 'ri-information-line';
+    if(type === 'success') iconClass = 'ri-checkbox-circle-line';
+    if(type === 'error') iconClass = 'ri-error-warning-line';
+    
+    toast.innerHTML = `<i class="${iconClass}"></i><span>${msg}</span>`;
+    container.appendChild(toast);
+    
+    // 3秒後自動消失
+    setTimeout(() => {
+        toast.style.animation = 'toastOut 0.3s forwards';
+        toast.addEventListener('animationend', () => toast.remove());
+    }, 3000);
+}
+
+function setCloudLoading(isLoading, text = "Processing...") {
+    const loader = document.getElementById('cloudLoader');
+    const txt = document.getElementById('cloudLoaderText');
+    if (isLoading) {
+        txt.textContent = text;
+        loader.style.display = 'flex';
+    } else {
+        loader.style.display = 'none';
+    }
+}
+
+// 連動 Cloud Icon 變化
+document.getElementById('useCloud').addEventListener('change', function(e) {
+    const icon = document.getElementById('cloudIconDisplay');
+    if(e.target.checked) {
+        icon.className = 'ri-cloud-line cloud-icon';
+        showToast('雲端模式已啟用', 'info');
+    } else {
+        icon.className = 'ri-cloud-off-line cloud-icon';
+    }
+});
+
+// --- Google Drive Integration (Beautified V26) ---
 const GD_CLIENT_ID = '747489154792-97q5ftdt2ii6bpbiva3hbtdvk8puq1f4.apps.googleusercontent.com'; 
 const GD_API_KEY = 'AIzaSyCalEqkmPm46fpDkOWINqQTuVzgSne7PGs'; 
 const GD_DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
-// 修改為 'https://www.googleapis.com/auth/drive' 以獲得完整存取權
 const GD_SCOPES = 'https://www.googleapis.com/auth/drive';
-
-// 從 Client ID 提取 Project Number
 const GD_PROJECT_NUM = GD_CLIENT_ID.split('-')[0];
 
 let tokenClient;
@@ -1546,7 +1638,6 @@ let gapiInited = false;
 let gisInited = false;
 let access_token = null;
 
-// 初始化 Google API
 function gapiLoaded() {
     gapi.load('client:picker', async () => {
         await gapi.client.init({ apiKey: GD_API_KEY, discoveryDocs: [GD_DISCOVERY_DOC] });
@@ -1573,25 +1664,25 @@ function gisLoaded() {
 let pendingCloudAction = null;
 
 function executeWithDrive(callback) {
-    if (!gapiInited || !gisInited) return alert("Google API 尚未載入，請檢查網路或 API 設定");
+    if (!gapiInited || !gisInited) return showToast("Google API 初始化中，請稍候...", "error");
+    
     if (access_token) {
         callback();
     } else {
+        // 顯示一個提示，讓使用者知道即將彈出視窗
+        showToast("正在連接 Google 帳號...", "info");
         pendingCloudAction = callback;
         tokenClient.requestAccessToken();
     }
 }
 
-// ☁️ 上傳檔案到 Drive (支援指定資料夾)
+// ☁️ 上傳檔案到 Drive
 async function uploadToDrive(fileName, content, mimeType = "text/html", folderId = null) {
+    setCloudLoading(true, "正在上傳至雲端...");
     try {
         const fileContent = new Blob([content], {type: mimeType});
         const metadata = { 'name': fileName, 'mimeType': mimeType };
-        
-        // ✨ 如果有指定資料夾 ID，就加入 parents 欄位
-        if (folderId) {
-            metadata['parents'] = [folderId];
-        }
+        if (folderId) metadata['parents'] = [folderId];
 
         const form = new FormData();
         form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
@@ -1604,22 +1695,28 @@ async function uploadToDrive(fileName, content, mimeType = "text/html", folderId
         });
         
         const data = await response.json();
-        if(data.id) alert(`✅ 成功儲存至 Google Drive！\n📂 位置: ${folderId ? "指定資料夾" : "根目錄"}\n📄 檔案 ID: ${data.id}`);
-        else alert("儲存失敗：" + JSON.stringify(data));
+        setCloudLoading(false);
+
+        if(data.id) {
+            showToast(`成功儲存！(ID: ${data.id.slice(-6)})`, "success");
+        } else {
+            showToast("儲存失敗：" + (data.error ? data.error.message : "未知錯誤"), "error");
+        }
     } catch (err) {
-        alert("上傳錯誤: " + err.message);
+        setCloudLoading(false);
+        showToast("上傳錯誤: " + err.message, "error");
     }
 }
 
-// ☁️ 建立「儲存」用的 Picker (選擇資料夾)
+// ☁️ 建立「儲存」用的 Picker
 function createSavePicker(fileName, content) {
     if (!access_token) return;
-
-    // 設定 View：只顯示資料夾，並允許選擇資料夾
+    setCloudLoading(true, "載入雲端選單...");
+    
     const view = new google.picker.DocsView(google.picker.ViewId.FOLDERS)
         .setIncludeFolders(true) 
-        .setMimeTypes('application/vnd.google-apps.folder') // 只顯示資料夾
-        .setSelectFolderEnabled(true) // ✨ 關鍵：允許選取資料夾作為目標
+        .setMimeTypes('application/vnd.google-apps.folder')
+        .setSelectFolderEnabled(true) 
         .setParent('root');
 
     const picker = new google.picker.PickerBuilder()
@@ -1627,30 +1724,31 @@ function createSavePicker(fileName, content) {
         .setOAuthToken(access_token)
         .addView(view)
         .setDeveloperKey(GD_API_KEY)
-        .setTitle(`儲存 "${fileName}" 到...`) // 動態標題
+        .setTitle(`選擇儲存位置 (${fileName})`)
         .setCallback(async (data) => {
-            // 當使用者選好資料夾後觸發
-            if (data[google.picker.Response.ACTION] == google.picker.Action.PICKED) {
+            // 無論是否選擇，Picker 關閉後都隱藏 loading
+            if (data[google.picker.Response.ACTION] === google.picker.Action.CANCEL) {
+                setCloudLoading(false);
+            }
+            else if (data[google.picker.Response.ACTION] == google.picker.Action.PICKED) {
                 const doc = data[google.picker.Response.DOCUMENTS][0];
                 const folderId = doc[google.picker.Document.ID];
-                const folderName = doc[google.picker.Document.NAME];
-                
-                // 執行上傳
-                console.log(`Selected folder: ${folderName} (${folderId})`);
                 await uploadToDrive(fileName, content, "text/html", folderId);
             }
         })
         .build();
 
     picker.setVisible(true);
+    // Picker 顯示後稍微延遲關閉 loading，讓轉場更順
+    setTimeout(() => setCloudLoading(false), 500); 
 }
 
-// ☁️ 建立「開啟」用的 Picker (選擇檔案)
+// ☁️ 建立「開啟」用的 Picker
 function createOpenPicker() {
     if (!access_token) return;
-    
+    setCloudLoading(true, "載入雲端選單...");
+
     const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
-        // .setMimeTypes("text/html") // 建議註解掉這行，這樣就能看到所有類型的檔案
         .setIncludeFolders(true)
         .setSelectFolderEnabled(false)
         .setParent('root');
@@ -1661,27 +1759,35 @@ function createOpenPicker() {
         .addView(view)
         .setDeveloperKey(GD_API_KEY)
         .setCallback(openPickerCallback)
-        .setTitle("開啟檔案")
+        .setTitle("開啟雲端檔案")
         .build();
         
     picker.setVisible(true);
+    setTimeout(() => setCloudLoading(false), 500);
 }
 
 async function openPickerCallback(data) {
+    if (data[google.picker.Response.ACTION] === google.picker.Action.CANCEL) {
+        return;
+    }
     if (data[google.picker.Response.ACTION] == google.picker.Action.PICKED) {
+        setCloudLoading(true, "正在讀取檔案...");
         const doc = data[google.picker.Response.DOCUMENTS][0];
         const fileId = doc[google.picker.Document.ID];
         const fileName = doc[google.picker.Document.NAME];
         try {
             const fileRes = await gapi.client.drive.files.get({ fileId: fileId, alt: 'media' });
             addTab(fileName.replace('.html', ''), fileRes.body);
-            alert(`已從雲端開啟: ${fileName}`);
-        } catch (err) { alert("讀取檔案失敗: " + err.message); }
+            setCloudLoading(false);
+            showToast(`已開啟: ${fileName}`, "success");
+        } catch (err) { 
+            setCloudLoading(false);
+            showToast("讀取失敗: " + err.message, "error");
+        }
     }
 }
 
-// --- ✨ 覆寫功能 (Safe Overrides) ---
-// 使用 window 檢查避免重複宣告錯誤
+// --- ✨ Override Logic (保持不變，但將 alert 移除) ---
 if (typeof window.originalDownload === 'undefined') {
     window.originalDownload = downloadHTML;
     window.originalOpenFile = openFile;
@@ -1695,7 +1801,6 @@ downloadHTML = function() {
         executeWithDrive(() => {
             const name = (tabs[currentTab].name || "download") + ".html";
             const content = tabs[currentTab].editor.getValue();
-            // ✨ 改為呼叫 SavePicker 讓使用者選位置
             createSavePicker(name, content);
         });
     } else {
@@ -1727,11 +1832,11 @@ processEncryption = function() {
     const pass = document.getElementById('encPass').value;
     const title = document.getElementById('encTitle').value || "Secured Document";
 
-    if (!account) return alert("錯誤：請設定帳號 (Account)");
-    if (!pass) return alert("錯誤：請設定加密密碼");
+    if (!account) return showToast("請設定帳號 (Account)", "error");
+    if (!pass) return showToast("請設定加密密碼", "error");
     
     const content = tabs[currentTab].editor.getValue();
-    if (!content.trim()) return alert("錯誤：檔案內容為空");
+    if (!content.trim()) return showToast("檔案內容為空", "error");
 
     try {
         const finalKey = account + pass;
@@ -1740,16 +1845,20 @@ processEncryption = function() {
         
         closeEncryptModal();
         
-        // ✨ 加密後也呼叫 SavePicker
         executeWithDrive(() => {
             createSavePicker("Encrypted_" + title + ".html", finalHtml);
         });
 
     } catch (err) {
-        alert("加密失敗：" + err.message);
+        showToast("加密失敗：" + err.message, "error");
     }
 };
 </script>
+<div id="toast-container"></div>
 
+<div id="cloudLoader">
+    <div class="spinner"></div>
+    <div class="loader-text" id="cloudLoaderText">Processing...</div>
+</div>
 </body>
 </html>
