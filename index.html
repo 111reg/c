@@ -1528,6 +1528,7 @@ lineStartInput.addEventListener("keydown", function(e) { if (e.key === "Enter") 
 </script>
 <script async defer src="https://apis.google.com/js/api.js" onload="gapiLoaded()"></script>
 <script async defer src="https://accounts.google.com/gsi/client" onload="gisLoaded()"></script>
+
 <script>
 // --- Google Drive Integration (V26 Cloud + Picker API) ---
 // ✨ 請在此填入你的 Google Client ID 和 API Key
@@ -1544,7 +1545,7 @@ let gapiInited = false;
 let gisInited = false;
 let access_token = null;
 
-// 初始化 Google API (修改：增加 'picker' 模組)
+// 初始化 Google API (包含 picker 模組)
 function gapiLoaded() {
     gapi.load('client:picker', async () => {
         await gapi.client.init({ apiKey: GD_API_KEY, discoveryDocs: [GD_DISCOVERY_DOC] });
@@ -1573,12 +1574,9 @@ let pendingCloudAction = null;
 // 驗證登入並執行動作
 function executeWithDrive(callback) {
     if (!gapiInited || !gisInited) return alert("Google API 尚未載入，請檢查網路或 API 設定");
-    
-    // 如果已有 token，直接執行
     if (access_token) {
         callback();
     } else {
-        // 否則跳轉登入
         pendingCloudAction = callback;
         tokenClient.requestAccessToken();
     }
@@ -1588,11 +1586,7 @@ function executeWithDrive(callback) {
 async function uploadToDrive(fileName, content, mimeType = "text/html") {
     try {
         const fileContent = new Blob([content], {type: mimeType});
-        const metadata = {
-            'name': fileName,
-            'mimeType': mimeType
-        };
-
+        const metadata = { 'name': fileName, 'mimeType': mimeType };
         const form = new FormData();
         form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
         form.append('file', fileContent);
@@ -1606,39 +1600,37 @@ async function uploadToDrive(fileName, content, mimeType = "text/html") {
         const data = await response.json();
         if(data.id) alert(`✅ 成功儲存至 Google Drive！\n檔案 ID: ${data.id}`);
         else alert("儲存失敗：" + JSON.stringify(data));
-
     } catch (err) {
         alert("上傳錯誤: " + err.message);
     }
 }
 
-// ☁️ 使用 Google Picker 開啟檔案 (取代原本的簡易列表)
-// ☁️ 使用 Google Picker 開啟檔案 (修正版：保留資料夾階層結構)
+// ☁️ 使用 Google Picker 開啟檔案 (修正版：顯示完整資料夾結構)
 function createPicker() {
     if (!access_token) return;
     
-    // 設定 View：使用 DocsView 標準模式
+    // 設定 View：顯示所有檔案與資料夾
     const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
-        .setMimeTypes("text/html")     // 只顯示 HTML 檔案
-        .setIncludeFolders(true)       // 必須包含資料夾，使用者才能點進去
-        .setSelectFolderEnabled(false) // 設定為不能「選取」資料夾 (只能點進去瀏覽)
-        .setParent('root');            // ✨ 關鍵：指定從「我的雲端硬碟」根目錄開始，確保是層級式顯示
+        .setMimeTypes("text/html")     // 只篩選 HTML
+        .setIncludeFolders(true)       // 允許瀏覽資料夾
+        .setSelectFolderEnabled(false) // 禁止選取資料夾本身 (只能選檔案)
+        .setParent('root');            // ✨ 關鍵：從根目錄開始，保持層級結構
 
     const picker = new google.picker.PickerBuilder()
-        // .enableFeature(google.picker.Feature.NAV_HIDDEN) // ❌ 關鍵修正：移除這行！開啟左側導航列，才能看到資料夾結構
+        // 注意：這裡移除了 enableFeature(NAV_HIDDEN)，讓左側導航列顯示出來
         .setAppId(GD_PROJECT_NUM)
         .setOAuthToken(access_token)
-        .addView(view)                 // 加入設定好的視圖
+        .addView(view)
         .setDeveloperKey(GD_API_KEY)
         .setCallback(pickerCallback)
-        .setTitle("請選擇 HTML 檔案")   // 視窗標題
-        .setSize(1051, 650)            // (選用) 加大視窗尺寸以利瀏覽
+        .setTitle("請選擇檔案 (可瀏覽資料夾)")
+        .setSize(1000, 600)
         .build();
         
     picker.setVisible(true);
 }
 
-// Picker 回呼函式
+// Picker 回呼
 async function pickerCallback(data) {
     if (data[google.picker.Response.ACTION] == google.picker.Action.PICKED) {
         const doc = data[google.picker.Response.DOCUMENTS][0];
@@ -1646,12 +1638,7 @@ async function pickerCallback(data) {
         const fileName = doc[google.picker.Document.NAME];
         
         try {
-            // 下載檔案內容
-            const fileRes = await gapi.client.drive.files.get({ 
-                fileId: fileId, 
-                alt: 'media' 
-            });
-            
+            const fileRes = await gapi.client.drive.files.get({ fileId: fileId, alt: 'media' });
             addTab(fileName.replace('.html', ''), fileRes.body);
             alert(`已從雲端開啟: ${fileName}`);
         } catch (err) {
@@ -1660,10 +1647,14 @@ async function pickerCallback(data) {
     }
 }
 
-// --- ✨ 覆寫現有功能 (Modified Functions) ---
+// --- ✨ 覆寫功能 (防止重複宣告錯誤) ---
+// 這裡使用 window 檢查，避免重複宣告變數導致 crash
+if (typeof window.originalDownload === 'undefined') {
+    window.originalDownload = downloadHTML;
+    window.originalOpenFile = openFile;
+    window.originalProcessEncryption = processEncryption;
+}
 
-// 1. 覆寫下載功能
-const originalDownload = downloadHTML;
 downloadHTML = function() {
     const useCloud = document.getElementById('useCloud').checked;
     if (useCloud && currentTab >= 0) {
@@ -1673,38 +1664,31 @@ downloadHTML = function() {
             uploadToDrive(name, content);
         });
     } else {
-        originalDownload(); // 執行原本的本地下載
+        window.originalDownload();
     }
 };
 
-// 2. 覆寫開啟檔案功能 (改用 Picker)
-const originalOpenFile = openFile;
 openFile = function() {
     const useCloud = document.getElementById('useCloud').checked;
     if (useCloud) {
         executeWithDrive(() => {
-            createPicker(); // ✨ 呼叫 Picker
+            createPicker();
         });
     } else {
-        originalOpenFile(); // 執行原本的本地開啟
+        window.originalOpenFile();
     }
 };
 
-// 3. 覆寫加密功能 (Process Encryption)
-const originalProcessEncryption = processEncryption;
 processEncryption = function() {
     const useCloud = document.getElementById('useCloud').checked;
-    
-    // 如果沒勾選 Cloud，直接跑原本的邏輯
     if (!useCloud) {
-        originalProcessEncryption();
+        window.originalProcessEncryption();
         return;
     }
-
-    // Cloud 模式下的加密邏輯
-    const account = encAccount.value.trim();
-    const pass = encPass.value;
-    const title = encTitle.value || "Secured Document";
+    // Cloud Encryption
+    const account = document.getElementById('encAccount').value.trim();
+    const pass = document.getElementById('encPass').value;
+    const title = document.getElementById('encTitle').value || "Secured Document";
 
     if (!account) return alert("錯誤：請設定帳號 (Account)");
     if (!pass) return alert("錯誤：請設定加密密碼");
@@ -1718,16 +1702,14 @@ processEncryption = function() {
         const finalHtml = getDecryptionTemplate(title, encrypted);
         
         closeEncryptModal();
-        
-        // 觸發雲端儲存
         executeWithDrive(() => {
             uploadToDrive("Encrypted_" + title + ".html", finalHtml);
         });
-
     } catch (err) {
         alert("加密失敗：" + err.message);
     }
 };
 </script>
+
 </body>
 </html>
