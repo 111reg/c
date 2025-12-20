@@ -1535,7 +1535,8 @@ lineStartInput.addEventListener("keydown", function(e) { if (e.key === "Enter") 
 const GD_CLIENT_ID = '747489154792-97q5ftdt2ii6bpbiva3hbtdvk8puq1f4.apps.googleusercontent.com'; 
 const GD_API_KEY = 'AIzaSyCalEqkmPm46fpDkOWINqQTuVzgSne7PGs'; 
 const GD_DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
-const GD_SCOPES = 'https://www.googleapis.com/auth/drive.file';
+// 修改為 'https://www.googleapis.com/auth/drive' 以獲得完整存取權
+const GD_SCOPES = 'https://www.googleapis.com/auth/drive';
 
 // 從 Client ID 提取 Project Number
 const GD_PROJECT_NUM = GD_CLIENT_ID.split('-')[0];
@@ -1649,9 +1650,9 @@ function createOpenPicker() {
     if (!access_token) return;
     
     const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
-        .setMimeTypes("text/html")
+        // .setMimeTypes("text/html") // 建議註解掉這行，這樣就能看到所有類型的檔案
         .setIncludeFolders(true)
-        .setSelectFolderEnabled(false) // 開啟模式不能選資料夾
+        .setSelectFolderEnabled(false)
         .setParent('root');
 
     const picker = new google.picker.PickerBuilder()
